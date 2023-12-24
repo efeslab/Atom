@@ -3,7 +3,7 @@
 
 ![overview](figures/overview_and_ppl.png)
 
-Atom is an accurate low-bit weight-activation quantization algorithm that combines (1) mixed-precision, (2) fine-grained group quantization, (3) dynamic activation quantization, (4) KV-cache quantization, and (5) efficient CUDA kernels co-design. This codebase utilizes [lm_eval](https://github.com/EleutherAI/lm-evaluation-harness.git) to evaluate perplexity and zero-shot accuracy on Llama models. And code segments from [SmoothQuant](https://github.com/mit-han-lab/smoothquant.git), [GPTQ](https://github.com/IST-DASLab/gptq.git), and [SparseGPT](https://github.com/IST-DASLab/sparsegpt.git) are integrated to reproduce results.
+Atom is an accurate low-bit weight-activation quantization algorithm that combines (1) mixed-precision, (2) fine-grained group quantization, (3) dynamic activation quantization, (4) KV-cache quantization, and (5) efficient CUDA kernels co-design. This codebase utilizes [lm_eval](https://github.com/EleutherAI/lm-evaluation-harness.git) to evaluate perplexity and zero-shot accuracy on Llama models. And code segments from [SmoothQuant](https://github.com/mit-han-lab/smoothquant.git), [GPTQ](https://github.com/IST-DASLab/gptq.git), and [SparseGPT](https://github.com/IST-DASLab/sparsegpt.git) are integrated to reproduce results. Our kernels are modified based on previous version of [FlashInfer](https://github.com/flashinfer-ai/flashinfer).
 
 The current release features:
 * Simulated quantization process for accuracy evaluation.
