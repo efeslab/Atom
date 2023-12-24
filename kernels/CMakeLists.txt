@@ -1,0 +1,50 @@
+cmake_minimum_required(VERSION 3.18)
+set(CMAKE_C_COMPILER "/usr/bin/gcc-11")
+set(CMAKE_CXX_COMPILER "/usr/bin/g++-11")
+
+project(atom CUDA CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_ARCHITECTURES 86)
+
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
+find_package(Thrust REQUIRED)
+add_subdirectory(3rdparty/nvbench)
+
+set(ATOM_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+
+message(STATUS "Compile GEMM kernel benchmark.")
+add_executable(bench_gemm_i4_o16 ${PROJECT_SOURCE_DIR}/src/GEMM/bench_dense_layer_gemm_i4_o16.cu)
+target_include_directories(bench_gemm_i4_o16 PRIVATE ${ATOM_INCLUDE_DIR})
+target_include_directories(bench_gemm_i4_o16 PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/nvbench)
+target_compile_options(bench_gemm_i4_o16 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=255 -gencode arch=compute_86,code=sm_86>) 
+target_link_libraries(bench_gemm_i4_o16 PRIVATE nvbench::main)
+
+message(STATUS "Compile Activate kernel benchmark.")
+add_executable(bench_activate ${PROJECT_SOURCE_DIR}/src/Activate/bench_activate.cu)
+target_include_directories(bench_activate PRIVATE ${ATOM_INCLUDE_DIR})
+target_include_directories(bench_activate PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/nvbench)
+target_compile_options(bench_activate PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=255 -gencode arch=compute_86,code=sm_86>) 
+target_link_libraries(bench_activate PRIVATE nvbench::main)
+
+message(STATUS "Compile RMSNorm kernel benchmark.")
+add_executable(bench_rmsnorm ${PROJECT_SOURCE_DIR}/src/RMSNorm/bench_rmsnorm.cu)
+target_include_directories(bench_rmsnorm PRIVATE ${ATOM_INCLUDE_DIR})
+target_include_directories(bench_rmsnorm PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/nvbench)
+target_compile_options(bench_rmsnorm PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=255 -gencode arch=compute_86,code=sm_86>) 
+target_link_libraries(bench_rmsnorm PRIVATE nvbench::main)
+
+message(STATUS "Compile Reorder kernel benchmark.")
+add_executable(bench_reorder ${PROJECT_SOURCE_DIR}/src/Reorder/bench_reorder.cu)
+target_include_directories(bench_reorder PRIVATE ${ATOM_INCLUDE_DIR})
+target_include_directories(bench_reorder PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/nvbench)
+target_compile_options(bench_reorder PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=255 -gencode arch=compute_86,code=sm_86>) 
+target_link_libraries(bench_reorder PRIVATE nvbench::main)
+
+message(STATUS "Compile Batched Self-attention kernel benchmark.")
+add_executable(bench_batch_decode ${PROJECT_SOURCE_DIR}/src/flashinfer/bench_batch_decode.cu)
+target_include_directories(bench_batch_decode PRIVATE ${ATOM_INCLUDE_DIR})
+target_include_directories(bench_batch_decode PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/nvbench)
+target_compile_options(bench_batch_decode PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=255 -gencode arch=compute_86,code=sm_86 -w>) 
+target_link_libraries(bench_batch_decode PRIVATE nvbench::main)
