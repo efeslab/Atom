@@ -3,7 +3,9 @@
 
 ![overview](figures/overview_and_ppl.png)
 
-Atom is an accurate low-bit weight-activation quantization algorithm that combines (1) mixed-precision, (2) fine-grained group quantization, (3) dynamic activation quantization, (4) KV-cache quantization, and (5) efficient CUDA kernels co-design. This codebase utilizes [lm_eval](https://github.com/EleutherAI/lm-evaluation-harness.git) to evaluate perplexity and zero-shot accuracy on Llama models. And code segments from [SmoothQuant](https://github.com/mit-han-lab/smoothquant.git), [GPTQ](https://github.com/IST-DASLab/gptq.git), and [SparseGPT](https://github.com/IST-DASLab/sparsegpt.git) are integrated to reproduce results. Our kernels are modified based on previous version of [FlashInfer](https://github.com/flashinfer-ai/flashinfer).
+Atom is an accurate low-bit weight-activation quantization algorithm that combines (1) mixed-precision, (2) fine-grained group quantization, (3) dynamic activation quantization, (4) KV-cache quantization, and (5) efficient CUDA kernels co-design. 
+
+This codebase utilizes [lm_eval](https://github.com/EleutherAI/lm-evaluation-harness.git) to evaluate perplexity and zero-shot accuracy on Llama models. And code segments from [SmoothQuant](https://github.com/mit-han-lab/smoothquant.git), [GPTQ](https://github.com/IST-DASLab/gptq.git), and [SparseGPT](https://github.com/IST-DASLab/sparsegpt.git) are integrated to reproduce results. Our kernels are modified based on previous version of [FlashInfer](https://github.com/flashinfer-ai/flashinfer) and tested by [NVBench](https://github.com/NVIDIA/nvbench/tree/main). Serving framework [Punica](https://github.com/punica-ai/punica) is integrated to evaluate end-to-end throughput and latency.
 
 The current release features:
 * Simulated quantization process for accuracy evaluation.
@@ -17,6 +19,7 @@ To do:
 
 ## Abstract
 The growing demand for Large Language Models (LLMs) in applications such as content generation, intelligent chatbots, and sentiment analysis poses considerable challenges for LLM service providers. To efficiently use GPU resources and boost throughput, batching multiple requests has emerged as a popular paradigm; to further speed up batching, LLM quantization techniques reduce memory consumption and increase computing capacity. However, prevalent quantization schemes (e.g., 8-bit weight-activation quantization) cannot fully leverage the capabilities of modern GPUs, such as 4-bit integer operators, resulting in sub-optimal performance.
+
 To maximize LLMs' serving throughput, we introduce Atom, a low-bit quantization method that achieves high throughput improvements with negligible accuracy loss. Atom significantly boosts serving throughput by using low-bit operators and considerably reduces memory consumption via low-bit quantization. It attains high accuracy by applying a novel mixed-precision and fine-grained quantization process. We evaluate Atom on 4-bit weight-activation quantization setups in the serving context. Atom improves end-to-end throughput by up to 7.73× compared to the FP16 and by 2.53× compared to INT8 quantization, while maintaining the same latency target.
 
 ## Installation
@@ -81,11 +84,12 @@ bash scripts/run_atom_ablation.sh /Path/To/Llama/Model
 ### Efficiency Evaluation
 We evaluate Atom on a RTX4090 GPU. Results below are executed in [cu113](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-052b3b515d9653f9c6e358e5b70f8bb9d75c17a8b2039055674dfa7caa970791?context=explore) docker container.
 
-To get INT4 GEMM kernel result, please execute
+To get INT4 GEMM kernel result, please execute:
 ```
 cd kernels/build
 ./bench_gemm_i4_o16
 ```
+Check `Elem/s` to see the computation throughput of the kernel.
 ![gemm](figures/bench_gemm.png)
 
 Other kernel results can be found in [kernels/README.md](kernels/README.md), which can be reproduced similarly.
@@ -108,4 +112,3 @@ If you find Atom is helpful to your research, please consider to cite our paper:
   year={2023}
 }
 ```
-
