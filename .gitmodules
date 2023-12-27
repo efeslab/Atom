@@ -1,3 +1,9 @@
 [submodule "kernels/3rdparty/nvbench"]
 	path = kernels/3rdparty/nvbench
 	url = https://github.com/NVIDIA/nvbench.git
+[submodule "kernels/3rdparty/torch-int"]
+	path = kernels/3rdparty/torch-int
+	url = https://github.com/Guangxuan-Xiao/torch-int.git
+[submodule "kernels/3rdparty/llm-awq"]
+	path = kernels/3rdparty/llm-awq
+	url = https://github.com/mit-han-lab/llm-awq.git

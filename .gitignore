@@ -33,3 +33,6 @@ ENV/
 # Sublime Text settings
 *.sublime-workspace
 *.sublime-project
+
+# PyTorch Source Files
+kernels/3rdparty/libtorch/
