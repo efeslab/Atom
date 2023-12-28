@@ -28,9 +28,9 @@ To maximize LLMs' serving throughput, we introduce Atom, a low-bit quantization 
 docker pull nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
 docker run -it --gpus all -v /PATH2MODEL:/model nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04 /bin/bash
 ```
-2. Clone this repo
+2. Clone this repo (Make sure you install Git, Conda, and CMake (>= 3.24))
 ```
-git clone https://github.com/efeslab/Atom
+git clone --recurse-submodules https://github.com/efeslab/Atom
 cd Atom
 ```
 3. Prepare environment
@@ -92,7 +92,7 @@ cd kernels/build
 Check `Elem/s` to see the computation throughput of the kernel.
 ![gemm](figures/bench_gemm.png)
 
-Other kernel results can be found in [kernels/README.md](kernels/README.md), which can be reproduced similarly.
+Other kernel of Atom can be evaluated similarly, for e.g., `./bench_reorder`. We conduct kernel evaluation on baselines as well. Please check [baselines/README.md](./kernels/baselines/README.md) to reproduce results. 
 
 ## Key Results
 ### Perplexity
