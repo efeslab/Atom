@@ -1,5 +1,5 @@
 # Atom: Low-bit Quantization for Efficient and Accurate LLM Serving
-[[paper](https://arxiv.org/abs/2310.19102)]
+[[paper](https://arxiv.org/abs/2310.19102)] [[slides](./figures/Atom_talk_yilong.pdf)]
 
 ![overview](figures/overview_and_ppl.png)
 
@@ -10,12 +10,13 @@ This codebase utilizes [lm_eval](https://github.com/EleutherAI/lm-evaluation-har
 The current release features:
 * Simulated quantization process for accuracy evaluation.
 * Perplexity and zero-shot accuracy evaluation
-* Kernel performance evaluation
+* Kernel & End-to-end evaluation
 
 To do:
 - [x] Release code for reproducing results.
-- [ ] Release code for end-to-end throughput evaluation.
+- [x] Release code for end-to-end throughput evaluation.
 - [ ] Optimize kernel for different GPUs.
+- [ ] Full inference workflow in real production scenario.
 
 ## Abstract
 The growing demand for Large Language Models (LLMs) in applications such as content generation, intelligent chatbots, and sentiment analysis poses considerable challenges for LLM service providers. To efficiently use GPU resources and boost throughput, batching multiple requests has emerged as a popular paradigm; to further speed up batching, LLM quantization techniques reduce memory consumption and increase computing capacity. However, prevalent quantization schemes (e.g., 8-bit weight-activation quantization) cannot fully leverage the capabilities of modern GPUs, such as 4-bit integer operators, resulting in sub-optimal performance.
@@ -92,8 +93,9 @@ cd kernels/build
 Check `Elem/s` to see the computation throughput of the kernel.
 ![gemm](figures/bench_gemm.png)
 
-Other kernel of Atom can be evaluated similarly, for e.g., `./bench_reorder`. We conduct kernel evaluation on baselines as well. Please check [baselines/README.md](./kernels/baselines/README.md) to reproduce results. 
+Other kernel of Atom can be evaluated similarly, for e.g., `./bench_reorder`. We conduct kernel evaluation on baselines as well. Please check [baselines/README.md](./kernels/baselines/README.md) to reproduce results.
 
+To reproduce end-to-end throughput and latency evaluation, please check [e2e/README.md](./e2e/README.md).
 ## Key Results
 ### Perplexity
 * Atom achieves strong perplexity results across WikiText2, PTB and C4 datasets across on Llama models family.
