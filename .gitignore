@@ -9,6 +9,7 @@ env/
 build/
 dist/
 *.log
+*.egg-info
 
 # pyenv
 .python-version
