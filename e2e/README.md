@@ -10,4 +10,4 @@ Note that current codebase is for efficiency evaluation. We use random weights a
 ## Usage Instruction
 Check README.md in each folder for detailed instructions.
 ## Results
-![e2e](figures/atom_e2e_eval.png)
+![e2e](../figures/atom_e2e_eval.png)
