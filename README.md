@@ -29,7 +29,7 @@ To maximize LLMs' serving throughput, we introduce Atom, a low-bit quantization 
 docker pull nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
 docker run -it --gpus all -v /PATH2MODEL:/model nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04 /bin/bash
 ```
-2. Clone this repo (Make sure you install Git, Conda, and CMake (>= 3.24))
+2. Clone this repo (Make sure you install Git, and Conda)
 ```
 git clone --recurse-submodules https://github.com/efeslab/Atom
 cd Atom
@@ -41,9 +41,14 @@ conda create -n atom python=3.10
 conda activate atom
 pip install -r requirements.txt
 ```
-4. Compile kernels benchmarks (Optional)
+4. Compile kernels benchmarks (Optional): Install gcc-11 and CMake (>= 3.24)
 ```
-cd kernels
+curl -s https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
+apt update
+apt install cmake
+
+cd /PATH_TO_ATOM/kernels
 apt install software-properties-common
 apt-get update
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
@@ -55,18 +60,10 @@ make -j
 ```
 ## Usage
 ### Accuracy Evaluation
-Below is an example script for running a W4A4 quantization using Atom. Before running this command, please download Llama model from [HuggingFace website](https://huggingface.co/models?sort=trending&search=llama) first.
+Before running this command, please download Llama model from [HuggingFace website](https://huggingface.co/models?sort=trending&search=llama) first.
 We recommend downloading from [HuggyLlama](https://huggingface.co/huggyllama).
-```
-python model/llama.py /Path/To/Llama/Model wikitext2 \
-    --wbits 4 --abits 4 --a_sym --w_sym \
-    --act_group_size 128 --weight_group_size 128 --weight_channel_group 2 \
-    --reorder --act_sort_metric hessian \
-    --a_clip_ratio 0.9 --w_clip_ratio 0.85 \
-    --keeper 128 --keeper_precision 3 --kv_cache --use_gptq \
-    --eval_ppl --eval_common_sense
-```
-We also provide several scripts to reproduce our results in the paper.
+
+We provide several scripts to reproduce our results in the paper:
 
 To run our W4A4 perplexity evaluation, please execute
 ```
@@ -82,6 +79,18 @@ To run our ablation study on different quantization optimizations, please run
 ```
 bash scripts/run_atom_ablation.sh /Path/To/Llama/Model
 ```
+
+
+You can also customize your own quantization setup by modifying the parameters. Check [model/llama.py](./model/llama.py) to see the description of each parameter.
+```
+python model/llama.py /Path/To/Llama/Model wikitext2 \
+    --wbits 4 --abits 4 --a_sym --w_sym \
+    --act_group_size 128 --weight_group_size 128 --weight_channel_group 2 \
+    --reorder --act_sort_metric hessian \
+    --a_clip_ratio 0.9 --w_clip_ratio 0.85 \
+    --keeper 128 --keeper_precision 3 --kv_cache --use_gptq \
+    --eval_ppl --eval_common_sense
+```
 ### Efficiency Evaluation
 We evaluate Atom on a RTX4090 GPU. Results below are executed in [cu113](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-052b3b515d9653f9c6e358e5b70f8bb9d75c17a8b2039055674dfa7caa970791?context=explore) docker container.
 
@@ -90,7 +99,7 @@ To get INT4 GEMM kernel result, please execute:
 cd kernels/build
 ./bench_gemm_i4_o16
 ```
-Check `Elem/s` to see the computation throughput of the kernel.
+Check column `Elem/s` to see the computation throughput of the kernel (Flop/s).
 ![gemm](figures/bench_gemm.png)
 
 Other kernel of Atom can be evaluated similarly, for e.g., `./bench_reorder`. We conduct kernel evaluation on baselines as well. Please check [baselines/README.md](./kernels/baselines/README.md) to reproduce results.

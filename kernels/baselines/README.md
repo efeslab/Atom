@@ -4,14 +4,14 @@ We use [NVBench](https://github.com/NVIDIA/nvbench.git) to evaluate the kernel p
 ```
 wget https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.1.2%2Bcu121.zip
 unzip libtorch-cxx11-abi-shared-with-deps-2.1.2+cu121.zip
-mv libtorch PATH_TO_ATOM/kernels/3rdparty/
+mv libtorch /PATH_TO_ATOM/kernels/3rdparty/
 ```
 Use the following instructions or scripts `build.sh` to build the baseline benchmark.
 ```
 mkdir build
 cd build
 # Fill in your libtorch path
-cmake .. -DCMAKE_PREFIX_PATH=/home/ylzhao/Atom/kernels/3rdparty/libtorch
+cmake .. -DCMAKE_PREFIX_PATH=/PATH_TO_ATOM/kernels/3rdparty/libtorch
 make -j
 ```
 ## Result
