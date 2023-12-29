@@ -24,4 +24,4 @@ W4A16 Evaluation:
 ![AWQ](../../figures/bench_awq.png)
 
 We also use PyTorch Extension to evaluate the performance of PyTorch API Kernel. Baselines are installed according to their official codebases. Please refer to this [notebook](./python-api.ipynb) to check the results. Below is a sample figure:
-![PyTorch API](../../figures/pytorch-api.png)
+![PyTorch API](../../figures/python-api.png)
