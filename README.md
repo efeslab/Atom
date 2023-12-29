@@ -43,14 +43,15 @@ pip install -r requirements.txt
 ```
 4. Compile kernels benchmarks (Optional): Install gcc-11 and CMake (>= 3.24)
 ```
+apt install software-properties-common lsb-release
+apt-get update
+
 curl -s https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
 apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
 apt update
 apt install cmake
 
 cd /PATH_TO_ATOM/kernels
-apt install software-properties-common
-apt-get update
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
 apt install -y gcc-11 g++-11
