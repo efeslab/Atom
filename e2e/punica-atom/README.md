@@ -1,7 +1,7 @@
 # Punica integreted with Atom
 ## Usage Instruction 
 ### Init Python Env
-Under the same container of accuracy evaluation, run:
+Under the same CUDA 11.3 container of accuracy evaluation (Check [README.md](../../README.md) to setup env), run:
 ```
 conda create -n e2e python=3.10
 conda activate e2e
