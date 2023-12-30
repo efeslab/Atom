@@ -19,6 +19,7 @@ python setup.py install
 ```
 ### E2E Throughput Test
 ```
+cd /PATH_TO_ATOM/e2e/punica-int8
 python -m benchmarks.bench_textgen --batch-size 32 --num-batches 20
 ```
 Sample Output:
