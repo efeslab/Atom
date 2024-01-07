@@ -61,7 +61,7 @@ make -j
 ```
 ## Usage
 ### Accuracy Evaluation
-Before running this command, please download Llama model from [HuggingFace website](https://huggingface.co/models?sort=trending&search=llama) first.
+Before running this command, please download Llama model from [Hugging Face website](https://huggingface.co/models?sort=trending&search=llama) first.
 We recommend downloading from [HuggyLlama](https://huggingface.co/huggyllama).
 
 We provide several scripts to reproduce our results in the paper:
