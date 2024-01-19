@@ -148,20 +148,24 @@ def get_c4_new(nsamples, seed, seqlen, model, tokenizer):
 def get_loaders(
     name, nsamples=128, seed=0, seqlen=2048, model=''
 ):
-    assert "llama" in model.lower(), "Only llama models are supported."
+    # assert "llama" in model.lower(), "Only llama models are supported."
 
-    from transformers import LlamaTokenizer 
-    tokenizer = LlamaTokenizer.from_pretrained(model, use_fast=False)
-    # Fix for transformer 4.28.0.dev0 compatibility
-    # See: https://github.com/Vahe1994/SpQR/blob/main/datautils.py#L164
-    if tokenizer.bos_token_id != 1 or tokenizer.eos_token_id != 2:
-        try:
-            tokenizer.bos_token_id = 1
-            tokenizer.eos_token_id = 2
-            print(f"bos/eos tokens updated: {tokenizer.bos_token_id=},  {tokenizer.eos_token_id=}")
-        except AttributeError:
-            pass
-            print(f"bos/eos tokens unchanged: {tokenizer.bos_token_id=},  {tokenizer.eos_token_id=}")
+    if "llama" in model.lower():
+        from transformers import LlamaTokenizer 
+        tokenizer = LlamaTokenizer.from_pretrained(model, use_fast=False)
+        # Fix for transformer 4.28.0.dev0 compatibility
+        # See: https://github.com/Vahe1994/SpQR/blob/main/datautils.py#L164
+        if tokenizer.bos_token_id != 1 or tokenizer.eos_token_id != 2:
+            try:
+                tokenizer.bos_token_id = 1
+                tokenizer.eos_token_id = 2
+                print(f"bos/eos tokens updated: {tokenizer.bos_token_id=},  {tokenizer.eos_token_id=}")
+            except AttributeError:
+                pass
+                print(f"bos/eos tokens unchanged: {tokenizer.bos_token_id=},  {tokenizer.eos_token_id=}")
+    else:
+        from transformers import AutoTokenizer 
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False, legacy=False)
     
     if 'wikitext2' in name:
         return get_wikitext2(nsamples, seed, seqlen, model, tokenizer)

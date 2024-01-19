@@ -6,6 +6,7 @@ from collections import defaultdict
 from pprint import pprint
 from modelutils import quantize_model, quantize_model_gptq, add_act_quant_wrapper, reorder_model
 from parallel_utils import map_layers_to_multi_gpus
+from transformers import AutoConfig, AutoModelForCausalLM
 from LMClass import LMClass
 import lm_eval
 from eval import pattern_match
@@ -159,10 +160,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model_name = args.model.lower().split('/')[-1]
-    if "llama" not in model_name:
-        model_name = args.model.split('/')[-2]
+    assert model_name != None, "Please check the model path."
 
-    model = get_llama(args.model)
+    config = AutoConfig.from_pretrained(args.model)
+    model = AutoModelForCausalLM.from_pretrained(args.model, config=config, device_map='cpu',torch_dtype=torch.float16)
+    model.seqlen = 2048
     model.eval()
 
     from pathlib import Path
@@ -228,12 +230,19 @@ if __name__ == '__main__':
 
     if args.eval_ppl:
         datasets = ['wikitext2', 'ptb', 'c4', 'ptb-new', 'c4-new']
+
         for dataset in datasets:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             print(f"Evaluating {dataset} ...")
-            ppl = llama_eval(model, testloader, DEV)
+            if "llama" in args.model.lower():
+                ppl = llama_eval(model, testloader, DEV)
+            elif "falcon" in args.model.lower():
+                ppl = falcon_eval(model, testloader, DEV)
+            else:
+                raise "Model not supported."
+
             print(f"targetResult,{dataset},{ppl:.3f}")
     
     # eval zero shot accuracy on commonsense datasets
