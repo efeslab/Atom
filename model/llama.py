@@ -4,7 +4,7 @@ from outlier import *
 from eval import *
 from collections import defaultdict
 from pprint import pprint
-from modelutils import quantize_model, quantize_model_gptq, add_act_quant_wrapper, reorder_model
+from modelutils import quantize_model_llama, quantize_model_falcon, quantize_model_gptq, add_act_quant_wrapper_llama, reorder_model
 from parallel_utils import map_layers_to_multi_gpus
 from transformers import AutoConfig, AutoModelForCausalLM
 from LMClass import LMClass
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     assert model_name != None, "Please check the model path."
 
     config = AutoConfig.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(args.model, config=config, device_map='cpu',torch_dtype=torch.float16)
+    model = AutoModelForCausalLM.from_pretrained(args.model, config=config, device_map='cpu', torch_dtype=torch.float16)
     model.seqlen = 2048
     model.eval()
 
@@ -216,7 +216,10 @@ if __name__ == '__main__':
     
     if args.abits < 16:
         print("Inserting activations quantizers ...")
-        model = add_act_quant_wrapper(model, device=DEV, args=args, scales=scales)
+        if "llama" in args.model.lower():
+            model = add_act_quant_wrapper_llama(model, device=DEV, args=args, scales=scales)
+        # elif "falcon" in args.model.lower():
+        #     model = add_act_quant_wrapper_falcon(model, device=DEV, args=args, scales=scales)
 
     if args.wbits < 16:
         print("Quantizing...")
@@ -226,7 +229,11 @@ if __name__ == '__main__':
             )
             model = quantize_model_gptq(model, device=DEV, args=args, dataloader=dataloader)
         else:
-            model = quantize_model(model, device=DEV, args=args)
+            if "llama" in args.model.lower():
+                model = quantize_model_llama(model, device=DEV, args=args)
+            elif "falcon" in args.model.lower():
+                model = quantize_model_falcon(model, device=DEV, args=args)
+
 
     if args.eval_ppl:
         datasets = ['wikitext2', 'ptb', 'c4', 'ptb-new', 'c4-new']

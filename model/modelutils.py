@@ -3,9 +3,11 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+from transformers.models.falcon.modeling_falcon import FalconDecoderLayer
 from qLlamaLayer import QLlamaDecoderLayer, QLinearLayer
-from functools import partial
+from qFalconLayer import QFalconDecoderLayer
 from gptq import GPTQ, Quantizer_GPTQ
+from functools import partial
 
 from quant import quantize_activation_wrapper, quantize_attn_v_wrapper, quantize_attn_k_wrapper
 
@@ -85,7 +87,7 @@ def reorder_model(model, device, args, reorder_index):
         torch.cuda.empty_cache()
     return model
 
-def add_act_quant_wrapper(model, device, args, scales):
+def add_act_quant_wrapper_llama(model, device, args, scales):
     model.config.use_cache = False
     layers = model.model.layers
     for i in tqdm(range(len(layers))):
@@ -134,7 +136,7 @@ def add_act_quant_wrapper(model, device, args, scales):
         torch.cuda.empty_cache()
     return model
 
-def quantize_model(model, device, args):
+def quantize_model_llama(model, device, args):
     model.config.use_cache = False
     layers = model.model.layers
     for i in tqdm(range(len(layers))):
@@ -158,6 +160,32 @@ def quantize_model(model, device, args):
         m.self_attn.k_proj.quant()
         m.self_attn.v_proj.quant()
         m.self_attn.o_proj.quant()
+
+        layers[i] = m.cpu()
+        torch.cuda.empty_cache()
+    return model
+
+def quantize_model_falcon(model, device, args):
+    model.config.use_cache = False
+    layers = model.transformer.h
+    for i in tqdm(range(len(layers))):
+        m = None
+        if isinstance(layers[i], FalconDecoderLayer):
+            m = QFalconDecoderLayer(
+                originalLayer=layers[i],
+                args=args,
+            )
+        elif isinstance(layers[i], QFalconDecoderLayer):
+            m = layers[i]
+
+        if m is None:
+            continue
+
+        m = m.to(device)
+        m.mlp.dense_h_to_4h.quant()
+        m.mlp.dense_4h_to_h.quant()
+        m.self_attention.query_key_value.quant()
+        m.self_attention.dense.quant()
 
         layers[i] = m.cpu()
         torch.cuda.empty_cache()
