@@ -8,7 +8,8 @@ from torch.nn import functional as F
 from transformers.models.falcon.modeling_falcon import FalconDecoderLayer, FalconMLP, FalconAttention
 from transformers.models.falcon.modeling_falcon import FalconRotaryEmbedding, FalconLinearScalingRotaryEmbedding, FalconDynamicNTKScalingRotaryEmbedding
 from transformers.models.falcon.modeling_falcon import dropout_add
-from qLlamaLayer import QLinearLayer, apply_rotary_pos_emb
+from qLlamaLayer import apply_rotary_pos_emb
+from qLinearLayer import QLinearLayer
 
 class QFalconAttention(nn.Module):
     def __init__(self, 

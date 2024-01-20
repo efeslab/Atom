@@ -3,8 +3,11 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+from transformers.models.opt.modeling_opt import OPTDecoderLayer
 from transformers.models.falcon.modeling_falcon import FalconDecoderLayer
-from qLlamaLayer import QLlamaDecoderLayer, QLinearLayer
+from qLinearLayer import QLinearLayer
+from qLlamaLayer import QLlamaDecoderLayer
+from qOPTLayer import QOPTDecoderLayer
 from qFalconLayer import QFalconDecoderLayer
 from gptq import GPTQ, Quantizer_GPTQ
 from functools import partial
@@ -160,6 +163,34 @@ def quantize_model_llama(model, device, args):
         m.self_attn.k_proj.quant()
         m.self_attn.v_proj.quant()
         m.self_attn.o_proj.quant()
+
+        layers[i] = m.cpu()
+        torch.cuda.empty_cache()
+    return model
+
+def quantize_model_opt(model, device, args):
+    model.config.use_cache = False
+    layers = model.model.decoder.layers
+    for i in tqdm(range(len(layers))):
+        m = None
+        if isinstance(layers[i], OPTDecoderLayer):
+            m = QOPTDecoderLayer(
+                originalLayer=layers[i],
+                args=args,
+            )
+        elif isinstance(layers[i], QOPTDecoderLayer):
+            m = layers[i]
+
+        if m is None:
+            continue
+
+        m = m.to(device)
+        m.fc1.quant()
+        m.fc2.quant()
+        m.self_attn.k_proj.quant()
+        m.self_attn.v_proj.quant()
+        m.self_attn.q_proj.quant()
+        m.self_attn.out_proj.quant()
 
         layers[i] = m.cpu()
         torch.cuda.empty_cache()

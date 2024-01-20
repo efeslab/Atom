@@ -4,7 +4,7 @@ from outlier import *
 from eval import *
 from collections import defaultdict
 from pprint import pprint
-from modelutils import quantize_model_llama, quantize_model_falcon, quantize_model_gptq, add_act_quant_wrapper_llama, reorder_model
+from modelutils import quantize_model_llama, quantize_model_opt, quantize_model_falcon, quantize_model_gptq, add_act_quant_wrapper_llama, reorder_model
 from parallel_utils import map_layers_to_multi_gpus
 from transformers import AutoConfig, AutoModelForCausalLM
 from LMClass import LMClass
@@ -23,6 +23,19 @@ def get_llama(model):
     model = LlamaForCausalLM.from_pretrained(model, torch_dtype=torch.float16)
     model.seqlen = 2048
     return model
+
+def get_opt(model):
+    import torch
+    def skip(*args, **kwargs):
+        pass
+    torch.nn.init.kaiming_uniform_ = skip
+    torch.nn.init.uniform_ = skip
+    torch.nn.init.normal_ = skip
+    from transformers import OPTForCausalLM
+    model = OPTForCausalLM.from_pretrained(model, torch_dtype=torch.float16)
+    model.seqlen = model.config.max_position_embeddings
+    return model
+
 
 if __name__ == '__main__':
     import argparse
@@ -162,9 +175,10 @@ if __name__ == '__main__':
     model_name = args.model.lower().split('/')[-1]
     assert model_name != None, "Please check the model path."
 
-    config = AutoConfig.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(args.model, config=config, device_map='cpu', torch_dtype=torch.float16)
-    model.seqlen = 2048
+    if "llama" in args.model.lower():
+        model = get_llama(args.model)
+    elif "opt" in args.model.lower():
+        model = get_opt(args.model)
     model.eval()
 
     from pathlib import Path
@@ -218,8 +232,6 @@ if __name__ == '__main__':
         print("Inserting activations quantizers ...")
         if "llama" in args.model.lower():
             model = add_act_quant_wrapper_llama(model, device=DEV, args=args, scales=scales)
-        # elif "falcon" in args.model.lower():
-        #     model = add_act_quant_wrapper_falcon(model, device=DEV, args=args, scales=scales)
 
     if args.wbits < 16:
         print("Quantizing...")
@@ -231,6 +243,8 @@ if __name__ == '__main__':
         else:
             if "llama" in args.model.lower():
                 model = quantize_model_llama(model, device=DEV, args=args)
+            elif "opt" in args.model.lower():
+                model = quantize_model_opt(model, device=DEV, args=args)
             elif "falcon" in args.model.lower():
                 model = quantize_model_falcon(model, device=DEV, args=args)
 
@@ -245,6 +259,8 @@ if __name__ == '__main__':
             print(f"Evaluating {dataset} ...")
             if "llama" in args.model.lower():
                 ppl = llama_eval(model, testloader, DEV)
+            elif "opt" in args.model.lower():
+                ppl = opt_eval(model, testloader, DEV)
             elif "falcon" in args.model.lower():
                 ppl = falcon_eval(model, testloader, DEV)
             else:
