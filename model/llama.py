@@ -4,9 +4,12 @@ from outlier import *
 from eval import *
 from collections import defaultdict
 from pprint import pprint
-from modelutils import quantize_model_llama, quantize_model_opt, quantize_model_falcon, quantize_model_gptq, add_act_quant_wrapper_llama, reorder_model
+# from modelutils import quantize_model_llama, quantize_model_opt, quantize_model_falcon, quantize_model_gptq, reorder_model_llama, reorder_model_opt
+# from modelutils import add_act_quant_wrapper_llama, add_act_quant_wrapper_opt
+# from modelutils import *
+from modelutils_llama import quantize_model_llama, reorder_model_llama, quantize_model_gptq_llama,  add_act_quant_wrapper_llama
+from modelutils_opt import quantize_model_opt, reorder_model_opt, quantize_model_gptq_opt,  add_act_quant_wrapper_opt
 from parallel_utils import map_layers_to_multi_gpus
-from transformers import AutoConfig, AutoModelForCausalLM
 from LMClass import LMClass
 import lm_eval
 from eval import pattern_match
@@ -191,9 +194,14 @@ if __name__ == '__main__':
                 args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             print("Getting activation stats...")
-            act_scales = get_act_stats(
-                model, dataloader, DEV, metric=args.act_sort_metric
-            )
+            if "llama" in args.model.lower():
+                act_scales = get_act_stats_llama(
+                    model, dataloader, DEV, metric=args.act_sort_metric
+                )
+            elif "opt" in args.model.lower():
+                act_scales = get_act_stats_opt(
+                    model, dataloader, DEV, metric=args.act_sort_metric
+                )
 
             print("Getting reording index...")
             reorder_index = get_reorder_index(model, act_scales)
@@ -209,29 +217,22 @@ if __name__ == '__main__':
             reorder_index = torch.load(index_filename)
 
         print("Reordering model...")
-        model = reorder_model(
-            model, device=DEV, args=args, reorder_index=reorder_index
-        )
-
-    if args.static == True:
-        assert args.abits < 16, "Static quantization should quantize A."
-        if args.cache_index == False:
-            dataloader, testloader = get_loaders(
-                args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
+        if "llama" in args.model.lower():
+            model = reorder_model_llama(
+                model, device=DEV, args=args, reorder_index=reorder_index
             )
-            print("Getting scales...")
-            scales = get_act_scales(model, dataloader, DEV, args)
-            torch.save(scales, f'../saved/{model_str}_scales_{args.dataset}_{args.act_group_size}.pt')
-        else:
-            print("Getting cached scales...")
-            scales = torch.load(f'../saved/{model_str}_scales_{args.dataset}_{args.act_group_size}.pt')
-    else:
-        scales = defaultdict(lambda: None)
+        elif "opt" in args.model.lower():
+            model = reorder_model_opt(
+                model, device=DEV, args=args, reorder_index=reorder_index
+            )
     
     if args.abits < 16:
         print("Inserting activations quantizers ...")
         if "llama" in args.model.lower():
+            scales = defaultdict(lambda: None)
             model = add_act_quant_wrapper_llama(model, device=DEV, args=args, scales=scales)
+        elif "opt" in args.model.lower():
+            model = add_act_quant_wrapper_opt(model, device=DEV, args=args)
 
     if args.wbits < 16:
         print("Quantizing...")
@@ -239,18 +240,20 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(
                 args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            model = quantize_model_gptq(model, device=DEV, args=args, dataloader=dataloader)
+            if "llama" in args.model.lower():
+                model = quantize_model_gptq_llama(model, device=DEV, args=args, dataloader=dataloader)
+            elif "opt" in args.model.lower():
+                model = quantize_model_gptq_opt(model, device=DEV, args=args, dataloader=dataloader)
         else:
             if "llama" in args.model.lower():
                 model = quantize_model_llama(model, device=DEV, args=args)
             elif "opt" in args.model.lower():
                 model = quantize_model_opt(model, device=DEV, args=args)
-            elif "falcon" in args.model.lower():
-                model = quantize_model_falcon(model, device=DEV, args=args)
 
 
     if args.eval_ppl:
-        datasets = ['wikitext2', 'ptb', 'c4', 'ptb-new', 'c4-new']
+        # datasets = ['wikitext2', 'ptb', 'c4', 'ptb-new', 'c4-new']
+        datasets = ["wikitext2"]
 
         for dataset in datasets:
             dataloader, testloader = get_loaders(

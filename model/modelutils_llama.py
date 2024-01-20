@@ -3,28 +3,16 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-from transformers.models.opt.modeling_opt import OPTDecoderLayer
 from transformers.models.falcon.modeling_falcon import FalconDecoderLayer
-from qLinearLayer import QLinearLayer
+from qLinearLayer import find_qlinear_layers
 from qLlamaLayer import QLlamaDecoderLayer
-from qOPTLayer import QOPTDecoderLayer
 from qFalconLayer import QFalconDecoderLayer
 from gptq import GPTQ, Quantizer_GPTQ
 from functools import partial
 
 from quant import quantize_activation_wrapper, quantize_attn_v_wrapper, quantize_attn_k_wrapper
 
-def find_qlinear_layers(module, name=''):
-    if type(module) == QLinearLayer:
-        return {name: module}
-    res = {}
-    for name1, child in module.named_children():
-        res.update(find_qlinear_layers(
-            child, name=name + '.' + name1 if name != '' else name1
-        ))
-    return res
-
-def reorder_model(model, device, args, reorder_index):
+def reorder_model_llama(model, device, args, reorder_index):
     model.config.use_cache = False
     layers = model.model.layers
     assert reorder_index is not None, "Reorder index is None"
@@ -168,34 +156,6 @@ def quantize_model_llama(model, device, args):
         torch.cuda.empty_cache()
     return model
 
-def quantize_model_opt(model, device, args):
-    model.config.use_cache = False
-    layers = model.model.decoder.layers
-    for i in tqdm(range(len(layers))):
-        m = None
-        if isinstance(layers[i], OPTDecoderLayer):
-            m = QOPTDecoderLayer(
-                originalLayer=layers[i],
-                args=args,
-            )
-        elif isinstance(layers[i], QOPTDecoderLayer):
-            m = layers[i]
-
-        if m is None:
-            continue
-
-        m = m.to(device)
-        m.fc1.quant()
-        m.fc2.quant()
-        m.self_attn.k_proj.quant()
-        m.self_attn.v_proj.quant()
-        m.self_attn.q_proj.quant()
-        m.self_attn.out_proj.quant()
-
-        layers[i] = m.cpu()
-        torch.cuda.empty_cache()
-    return model
-
 def quantize_model_falcon(model, device, args):
     model.config.use_cache = False
     layers = model.transformer.h
@@ -222,7 +182,7 @@ def quantize_model_falcon(model, device, args):
         torch.cuda.empty_cache()
     return model
 
-def quantize_model_gptq(model, device, args, dataloader):
+def quantize_model_gptq_llama(model, device, args, dataloader):
     print('Starting GPTQ quantization ...')
 
     use_cache = model.config.use_cache

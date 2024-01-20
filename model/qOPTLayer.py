@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from transformers.models.opt.configuration_opt import OPTConfig
 from transformers.models.opt.modeling_opt import OPTDecoderLayer, OPTAttention
 from qLinearLayer import QLinearLayer
+from quant import Quantizer
 
 class QOPTAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
@@ -14,12 +15,17 @@ class QOPTAttention(nn.Module):
         args
     ):
         super().__init__()
+        self.abits = args.abits
+        self.q_kv_cache = args.kv_cache
         self.config = originalAttn.config
 
         self.embed_dim = originalAttn.embed_dim
         self.num_heads = originalAttn.num_heads
         self.dropout = originalAttn.dropout
         self.enable_bias = originalAttn.enable_bias
+        self.act_quant = lambda x: x
+        self.k_quant = lambda x: x
+        self.v_quant = lambda x: x
 
         self.head_dim = self.embed_dim // self.num_heads
         self.is_causal = True
@@ -36,6 +42,7 @@ class QOPTAttention(nn.Module):
         self.v_proj = QLinearLayer(originalAttn.v_proj, args)
         self.q_proj = QLinearLayer(originalAttn.q_proj, args)
         self.out_proj = QLinearLayer(originalAttn.out_proj, args)
+        self.register_buffer("out_reorder_index", None)
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
         return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
@@ -94,6 +101,10 @@ class QOPTAttention(nn.Module):
         key_states = key_states.view(*proj_shape)
         value_states = value_states.view(*proj_shape)
 
+        # Fake quantize the key_states
+        if self.q_kv_cache:
+            key_states = self.k_quant(key_states)
+
         src_len = key_states.size(1)
         attn_weights = torch.bmm(query_states, key_states.transpose(1, 2))
 
@@ -139,9 +150,18 @@ class QOPTAttention(nn.Module):
         else:
             attn_weights_reshaped = None
 
-        attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+        # attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+        # attn_output = torch.bmm(attn_probs, value_states)
 
-        attn_output = torch.bmm(attn_probs, value_states)
+        # Quantize attention output
+        if self.abits < 16:
+            attn_weights = self.act_quant(attn_weights)
+
+        # Fake quantize the value_states
+        if self.q_kv_cache:
+            value_states = self.v_quant(value_states)
+
+        attn_output = torch.bmm(attn_weights, value_states)
 
         if attn_output.size() != (bsz * self.num_heads, tgt_len, self.head_dim):
             raise ValueError(
@@ -156,6 +176,9 @@ class QOPTAttention(nn.Module):
         # partitioned aross GPUs when using tensor-parallelism.
         attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
 
+        if self.out_reorder_index is not None:
+            attn_output = torch.index_select(attn_output, 2, self.out_reorder_index)
+
         attn_output = self.out_proj(attn_output)
 
         return attn_output, attn_weights_reshaped, past_key_value
@@ -167,14 +190,25 @@ class QLayerNorm(torch.nn.Module):
         ):
         super().__init__()
         # self.input_scale = 1.0
+        self.abits = args.abits
         self.eps = originalNorm.eps
         self.register_buffer('weight', originalNorm.weight)
         self.register_buffer('bias', originalNorm.bias)
+        self.register_buffer("reorder_index", None)
+        self.act_quant = lambda x: x
 
     def forward(self, hidden_states):
         hidden_states = hidden_states.to(self.weight.dtype)
         outputs = torch.nn.functional.layer_norm(
             hidden_states, hidden_states.shape[-1:], self.weight, self.bias, self.eps)
+
+        if self.reorder_index is not None:
+            assert outputs.shape[outputs.dim()-1] == self.reorder_index.shape[0]
+            outputs = torch.index_select(outputs, outputs.dim()-1, self.reorder_index)
+
+        if self.abits < 16:
+            outputs = self.act_quant(outputs)
+
         return outputs 
 
 
@@ -185,6 +219,7 @@ class QOPTDecoderLayer(nn.Module):
                  args
         ):
         super().__init__()
+        self.abits = args.abits
         self.originalLayer = originalLayer
         self.emded_dim = originalLayer.embed_dim
 
@@ -197,6 +232,7 @@ class QOPTDecoderLayer(nn.Module):
         self.fc1 = QLinearLayer(originalLayer.fc1, args)
         self.fc2 = QLinearLayer(originalLayer.fc2, args)
         self.final_layer_norm = QLayerNorm(originalLayer.final_layer_norm, args)
+        self.fc_act_quant = lambda x: x
 
     def forward(
         self,
@@ -255,6 +291,9 @@ class QOPTDecoderLayer(nn.Module):
 
         hidden_states = self.fc1(hidden_states)
         hidden_states = self.activation_fn(hidden_states)
+
+        if self.abits < 16:
+            hidden_states = self.fc_act_quant(hidden_states)
 
         hidden_states = self.fc2(hidden_states)
         # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)

@@ -167,6 +167,8 @@ class QLlamaAttention(nn.Module):
         args
     ):
         super().__init__()
+        self.abits = args.abits
+        self.q_kv_cache = args.kv_cache
         self.config = originalAttn.config
         self.hidden_size = originalAttn.hidden_size
         self.num_heads = originalAttn.num_heads
@@ -243,7 +245,8 @@ class QLlamaAttention(nn.Module):
         
         # Fake quantize the key_states.
         # Preserve the position embedding info by first quantize.
-        key_states = self.k_quant(key_states)
+        if self.q_kv_cache:
+            key_states = self.k_quant(key_states)
         
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
@@ -278,7 +281,8 @@ class QLlamaAttention(nn.Module):
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
         # Fake quantize the value_states
-        value_states = self.v_quant(value_states)
+        if self.q_kv_cache:
+            value_states = self.v_quant(value_states)
 
         attn_output = torch.matmul(attn_weights, value_states)
 

@@ -2,6 +2,16 @@ import torch
 import torch.nn as nn
 from quant import fake_quantize_quarter_E5M2, fake_quantize_quarter_E4M3, quantize_tensor, quantize_tensor_channel_group
 
+def find_qlinear_layers(module, name=''):
+    if type(module) == QLinearLayer:
+        return {name: module}
+    res = {}
+    for name1, child in module.named_children():
+        res.update(find_qlinear_layers(
+            child, name=name + '.' + name1 if name != '' else name1
+        ))
+    return res
+
 class QLinearLayer(nn.Module):
     def __init__(
         self,
