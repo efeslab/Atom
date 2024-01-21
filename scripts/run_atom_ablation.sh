@@ -50,7 +50,7 @@ do
     logFile=$dir/atom_${model}_w${bit}a${bit}_${log_arr[${idx}]}.log
 
     echo "cmd config: " ${cmd_arr[${idx}]}
-    python ${dir}/model/llama.py ${MODEL} ${CALIB_DATA} ${cmd_arr[${idx}]} 2>&1 | tee ${logFile}
+    python ${dir}/model/main.py ${MODEL} ${CALIB_DATA} ${cmd_arr[${idx}]} 2>&1 | tee ${logFile}
 
     wiki2=`cat $logFile | grep ",wikitext2," | awk -F ',' 'BEGIN { OFS = "," } {print $3}'`
 

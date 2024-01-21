@@ -35,7 +35,6 @@ def reorder_model_opt(model, device, args, reorder_index):
         )
         m.fc2.reorder(
             in_reorder_index=reorder_index[nameTemplate_fc.format(i, 'fc2', 'input')],
-            # out_reorder_index=reorder_index[nameTemplate_fc.format(i, 'fc2', 'input')]
             out_reorder_index=None
         )
 
@@ -43,12 +42,10 @@ def reorder_model_opt(model, device, args, reorder_index):
         # Output Not reorder due to the RoPE embedding.
         m.self_attn.q_proj.reorder(
             in_reorder_index=reorder_index[nameTemplate_attn.format(i, 'self_attn', 'q_proj', 'input')],
-            # out_reorder_index=reorder_index[nameTemplate.format(i, 'self_attn', 'k_proj', 'output')]
             out_reorder_index=None
         )
         m.self_attn.k_proj.reorder(
             in_reorder_index=reorder_index[nameTemplate_attn.format(i, 'self_attn', 'k_proj', 'input')],
-            # out_reorder_index=reorder_index[nameTemplate.format(i, 'self_attn', 'k_proj', 'output')]
             out_reorder_index=None
         )
         m.self_attn.v_proj.reorder(
@@ -78,7 +75,7 @@ def reorder_model_opt(model, device, args, reorder_index):
         torch.cuda.empty_cache()
     return model
 
-def add_act_quant_wrapper_opt(model, device, args):
+def add_act_quant_wrapper_opt(model, device, args, scales=None):
     model.config.use_cache = False
     layers = model.model.decoder.layers
 
@@ -144,15 +141,8 @@ def quantize_model_gptq_opt(model, device, args, dataloader):
     model.config.use_cache = False
     layers = model.model.decoder.layers
 
-    # model.model.embed_tokens = model.model.embed_tokens.to(device)
-    # model.model.norm = model.model.norm.to(device)
-    # layers[0] = layers[0].to(device)
     model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(device)
     model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(device)
-    # if hasattr(model.model.decoder, 'project_out') and model.model.decoder.project_out:
-    #     model.model.decoder.project_out = model.model.decoder.project_out.to(device) 
-    # if hasattr(model.model.decoder, 'project_in') and model.model.decoder.project_in:
-    #     model.model.decoder.project_in = model.model.decoder.project_in.to(device) 
     layers[0] = layers[0].to(device)
 
     dtype = next(iter(model.parameters())).dtype
@@ -180,15 +170,13 @@ def quantize_model_gptq_opt(model, device, args, dataloader):
             pass
     layers[0] = layers[0].module
     layers[0] = layers[0].cpu()
-    # model.model.embed_tokens = model.model.embed_tokens.cpu()
-    # model.model.norm = model.model.norm.cpu()
+
     model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
     model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
-    # position_ids = cache['position_ids']
 
     quantizers = {}
     for i in tqdm(range(len(layers))):

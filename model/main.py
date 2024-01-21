@@ -4,9 +4,6 @@ from outlier import *
 from eval import *
 from collections import defaultdict
 from pprint import pprint
-# from modelutils import quantize_model_llama, quantize_model_opt, quantize_model_falcon, quantize_model_gptq, reorder_model_llama, reorder_model_opt
-# from modelutils import add_act_quant_wrapper_llama, add_act_quant_wrapper_opt
-# from modelutils import *
 from modelutils_llama import quantize_model_llama, reorder_model_llama, quantize_model_gptq_llama,  add_act_quant_wrapper_llama
 from modelutils_opt import quantize_model_opt, reorder_model_opt, quantize_model_gptq_opt,  add_act_quant_wrapper_opt
 from parallel_utils import map_layers_to_multi_gpus
@@ -180,12 +177,22 @@ if __name__ == '__main__':
 
     if "llama" in args.model.lower():
         model = get_llama(args.model)
+        get_act_stats_func = get_act_stats_llama
+        reorder_model_func = reorder_model_llama
+        add_act_quant_wrapper_func = add_act_quant_wrapper_llama
+        quantize_model_gptq_func = quantize_model_gptq_llama
+        quantize_model_func = quantize_model_llama
+        eval_func = llama_eval
     elif "opt" in args.model.lower():
         model = get_opt(args.model)
+        get_act_stats_func = get_act_stats_opt
+        reorder_model_func = reorder_model_opt
+        add_act_quant_wrapper_func = add_act_quant_wrapper_opt
+        quantize_model_gptq_func = quantize_model_gptq_opt
+        quantize_model_func = quantize_model_opt
+        eval_func = opt_eval
     model.eval()
 
-    from pathlib import Path
-    import pathlib
     import os
 
     if args.reorder:
@@ -194,14 +201,9 @@ if __name__ == '__main__':
                 args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             print("Getting activation stats...")
-            if "llama" in args.model.lower():
-                act_scales = get_act_stats_llama(
-                    model, dataloader, DEV, metric=args.act_sort_metric
-                )
-            elif "opt" in args.model.lower():
-                act_scales = get_act_stats_opt(
-                    model, dataloader, DEV, metric=args.act_sort_metric
-                )
+            act_scales = get_act_stats_func(
+                model, dataloader, DEV, metric=args.act_sort_metric
+            )
 
             print("Getting reording index...")
             reorder_index = get_reorder_index(model, act_scales)
@@ -217,22 +219,14 @@ if __name__ == '__main__':
             reorder_index = torch.load(index_filename)
 
         print("Reordering model...")
-        if "llama" in args.model.lower():
-            model = reorder_model_llama(
-                model, device=DEV, args=args, reorder_index=reorder_index
-            )
-        elif "opt" in args.model.lower():
-            model = reorder_model_opt(
-                model, device=DEV, args=args, reorder_index=reorder_index
-            )
+        model = reorder_model_func(
+            model, device=DEV, args=args, reorder_index=reorder_index
+        )
     
     if args.abits < 16:
         print("Inserting activations quantizers ...")
-        if "llama" in args.model.lower():
-            scales = defaultdict(lambda: None)
-            model = add_act_quant_wrapper_llama(model, device=DEV, args=args, scales=scales)
-        elif "opt" in args.model.lower():
-            model = add_act_quant_wrapper_opt(model, device=DEV, args=args)
+        scales = defaultdict(lambda: None)
+        model = add_act_quant_wrapper_func(model, device=DEV, args=args, scales=scales)
 
     if args.wbits < 16:
         print("Quantizing...")
@@ -240,39 +234,26 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(
                 args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            if "llama" in args.model.lower():
-                model = quantize_model_gptq_llama(model, device=DEV, args=args, dataloader=dataloader)
-            elif "opt" in args.model.lower():
-                model = quantize_model_gptq_opt(model, device=DEV, args=args, dataloader=dataloader)
+            model = quantize_model_gptq_func(model, device=DEV, args=args, dataloader=dataloader)
         else:
-            if "llama" in args.model.lower():
-                model = quantize_model_llama(model, device=DEV, args=args)
-            elif "opt" in args.model.lower():
-                model = quantize_model_opt(model, device=DEV, args=args)
+            model = quantize_model_func(model, device=DEV, args=args)
 
 
     if args.eval_ppl:
-        # datasets = ['wikitext2', 'ptb', 'c4', 'ptb-new', 'c4-new']
-        datasets = ["wikitext2"]
+        datasets = ['wikitext2', 'ptb', 'c4']
 
         for dataset in datasets:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             print(f"Evaluating {dataset} ...")
-            if "llama" in args.model.lower():
-                ppl = llama_eval(model, testloader, DEV)
-            elif "opt" in args.model.lower():
-                ppl = opt_eval(model, testloader, DEV)
-            elif "falcon" in args.model.lower():
-                ppl = falcon_eval(model, testloader, DEV)
-            else:
-                raise "Model not supported."
+            ppl = eval_func(model, testloader, DEV)
 
             print(f"targetResult,{dataset},{ppl:.3f}")
     
     # eval zero shot accuracy on commonsense datasets
     if args.eval_common_sense:
+        assert "llama" in args.model.lower(), "Only support llama for accuracy eval for now."
 
         lm = LMClass(args, model)
         lm.seqlen = 2048

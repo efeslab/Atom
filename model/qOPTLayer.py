@@ -153,10 +153,6 @@ class QOPTAttention(nn.Module):
         # attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
         # attn_output = torch.bmm(attn_probs, value_states)
 
-        # Quantize attention output
-        if self.abits < 16:
-            attn_weights = self.act_quant(attn_weights)
-
         # Fake quantize the value_states
         if self.q_kv_cache:
             value_states = self.v_quant(value_states)
@@ -178,6 +174,10 @@ class QOPTAttention(nn.Module):
 
         if self.out_reorder_index is not None:
             attn_output = torch.index_select(attn_output, 2, self.out_reorder_index)
+
+        # Quantize attention output
+        if self.abits < 16:
+            attn_output = self.act_quant(attn_output)
 
         attn_output = self.out_proj(attn_output)
 

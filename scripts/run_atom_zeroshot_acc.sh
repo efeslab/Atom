@@ -21,7 +21,7 @@ resultFile=$dir/atom_llama_zeroshot_acc.csv
 logFile=$dir/${MODEL}_w${BIT}a${BIT}_zeroshot.log
 touch $logFile
 
-CUDA_VISIBLE_DEVICE=0 python ${dir}/model/llama.py ${MODEL} ${CALIB_DATA} \
+CUDA_VISIBLE_DEVICE=0 python ${dir}/model/main.py ${MODEL} ${CALIB_DATA} \
     ${cmd_base} ${cmd_group} ${cmd_reorder} ${cmd_clip} ${cmd_adv} ${cmd_eval} \
     2>&1 | tee ${logFile}
 

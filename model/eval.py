@@ -14,8 +14,7 @@ def pattern_match(patterns, source_list):
 def llama_eval(model, testenc, dev):
     testenc = testenc.input_ids
     nsamples = testenc.numel() // model.seqlen
-    # layers = model.model.layers
-    layers = model.model.decoder.layers
+    layers = model.model.layers
 
     model.model.embed_tokens = model.model.embed_tokens.to(dev)
     layers[0] = layers[0].to(dev)
