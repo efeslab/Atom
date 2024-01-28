@@ -8,8 +8,9 @@ from modelutils_llama import quantize_model_llama, reorder_model_llama, quantize
 from modelutils_opt import quantize_model_opt, reorder_model_opt, quantize_model_gptq_opt,  add_act_quant_wrapper_opt
 from parallel_utils import map_layers_to_multi_gpus
 from LMClass import LMClass
-import lm_eval
 from eval import pattern_match
+from lm_eval import tasks as lm_tasks
+from lm_eval import evaluator as lm_evaluator
 
 
 def get_llama(model):
@@ -253,8 +254,6 @@ if __name__ == '__main__':
     
     # eval zero shot accuracy on commonsense datasets
     if args.eval_common_sense:
-        assert "llama" in args.model.lower(), "Only support llama for accuracy eval for now."
-
         lm = LMClass(args, model)
         lm.seqlen = 2048
         lm.model.eval()
@@ -262,25 +261,36 @@ if __name__ == '__main__':
             param.requires_grad = False
 
         if args.multigpu:
-            map_layers_to_multi_gpus(lm.model.model.layers)
-            input_device = lm.model.model.layers[0].device
-            output_device = lm.model.model.layers[-1].device
-            assert input_device == output_device
-            lm._device = input_device
-            lm.model.model.embed_tokens.to(input_device)
-            lm.model.model.norm.to(output_device)
-            lm.model.lm_head.to(output_device)
+            if "llama" in args.model.lower():
+                map_layers_to_multi_gpus(lm.model.model.layers)
+                input_device = lm.model.model.layers[0].device
+                output_device = lm.model.model.layers[-1].device
+                assert input_device == output_device
+                lm._device = input_device
+                lm.model.model.embed_tokens.to(input_device)
+                lm.model.model.norm.to(output_device)
+                lm.model.lm_head.to(output_device)
+            elif "opt" in args.model.lower():
+                map_layers_to_multi_gpus(lm.model.model.decoder.layers)
+                input_device = lm.model.model.decoder.layers[0].device
+                output_device = lm.model.model.decoder.layers[-1].device
+                assert input_device == output_device
+                lm._device = input_device
+                lm.model.model.decoder.embed_tokens.to(input_device)
+                lm.model.model.decoder.embed_positions.to(input_device)
+                lm.model.model.decoder.final_layer_norm.to(input_device)
+                lm.model.lm_head.to(output_device)
         else:
             lm._device = DEV
             lm.model = lm.model.to(lm.device)
 
         results = {}
         tasks_str = "piqa,arc_easy,arc_challenge,boolq,hellaswag,winogrande"
-        task_names = pattern_match(tasks_str.split(","), lm_eval.tasks.ALL_TASKS)
+        task_names = pattern_match(tasks_str.split(","), lm_tasks.ALL_TASKS)
         print(f"Selected Tasks: {task_names}")
 
-        task_dict = lm_eval.tasks.get_task_dict(task_names)
-        t_results = lm_eval.evaluator.evaluate(
+        task_dict = lm_tasks.get_task_dict(task_names)
+        t_results = lm_evaluator.evaluate(
             lm,
             task_dict,
             num_fewshot=args.lm_eval_num_fewshot,

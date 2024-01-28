@@ -3,10 +3,8 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-from transformers.models.falcon.modeling_falcon import FalconDecoderLayer
 from qLinearLayer import find_qlinear_layers
 from qLlamaLayer import QLlamaDecoderLayer
-from qFalconLayer import QFalconDecoderLayer
 from gptq import GPTQ, Quantizer_GPTQ
 from functools import partial
 
@@ -151,32 +149,6 @@ def quantize_model_llama(model, device, args):
         m.self_attn.k_proj.quant()
         m.self_attn.v_proj.quant()
         m.self_attn.o_proj.quant()
-
-        layers[i] = m.cpu()
-        torch.cuda.empty_cache()
-    return model
-
-def quantize_model_falcon(model, device, args):
-    model.config.use_cache = False
-    layers = model.transformer.h
-    for i in tqdm(range(len(layers))):
-        m = None
-        if isinstance(layers[i], FalconDecoderLayer):
-            m = QFalconDecoderLayer(
-                originalLayer=layers[i],
-                args=args,
-            )
-        elif isinstance(layers[i], QFalconDecoderLayer):
-            m = layers[i]
-
-        if m is None:
-            continue
-
-        m = m.to(device)
-        m.mlp.dense_h_to_4h.quant()
-        m.mlp.dense_4h_to_h.quant()
-        m.self_attention.query_key_value.quant()
-        m.self_attention.dense.quant()
 
         layers[i] = m.cpu()
         torch.cuda.empty_cache()
