@@ -24,18 +24,22 @@ class LMClass(BaseLM):
         # We use default dtype float16
         config.torch_dtype = torch.float16
 
-        # Fix for transformer 4.28.0.dev0 compatibility
-        # See: https://github.com/Vahe1994/SpQR/blob/main/datautils.py#L164
-        from transformers import LlamaTokenizer
-        self.tokenizer = LlamaTokenizer.from_pretrained(args.model, use_fast=False)
-        if self.tokenizer.bos_token_id != 1 or self.tokenizer.eos_token_id != 2:
-            try:
-                self.tokenizer.bos_token_id = 1
-                self.tokenizer.eos_token_id = 2
-                print(f"bos/eos tokens updated: {self.tokenizer.bos_token_id=},  {self.tokenizer.eos_token_id=}")
-            except AttributeError:
-                pass
-                print(f"bos/eos tokens unchanged: {self.tokenizer.bos_token_id=},  {self.tokenizer.eos_token_id=}")
+        if "llama" in args.model.lower():
+            # Fix for transformer 4.28.0.dev0 compatibility
+            # See: https://github.com/Vahe1994/SpQR/blob/main/datautils.py#L164
+            from transformers import LlamaTokenizer
+            self.tokenizer = LlamaTokenizer.from_pretrained(args.model, use_fast=False)
+            if self.tokenizer.bos_token_id != 1 or self.tokenizer.eos_token_id != 2:
+                try:
+                    self.tokenizer.bos_token_id = 1
+                    self.tokenizer.eos_token_id = 2
+                    print(f"bos/eos tokens updated: {self.tokenizer.bos_token_id=},  {self.tokenizer.eos_token_id=}")
+                except AttributeError:
+                    pass
+                    print(f"bos/eos tokens unchanged: {self.tokenizer.bos_token_id=},  {self.tokenizer.eos_token_id=}")
+        else:
+            from transformers import AutoTokenizer 
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False, legacy=False)
 
         if model != None:
             self.model = model

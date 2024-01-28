@@ -110,6 +110,15 @@ To reproduce end-to-end throughput and latency evaluation, please check [e2e/REA
 ### Perplexity
 * Atom achieves strong perplexity results across WikiText2, PTB and C4 datasets across on Llama models family.
 ![perplexity](figures/atom_ppl.png)
+* Below is Atom's WikiText2 perplexity of OPT, comparing with SmoothQuant and OmniQuant. Note that for OPT-66B, Atom's result is without using GPTQ optimization.
+
+|#Bit|Method|OPT-6.7B|OPT-13B|OPT-30B|OPT-66B|
+|-|-|-|-|-|-|
+|FP16|-|10.86|10.13|9.56|9.34|
+|W4A4|SmoothQ|1.80E+04|7.40E+03|1.20E+04|2.20E+05|
+|W4A4|OmniQ|12.24|11.65|10.6|10.29|
+|W4A4|Atom|11.23|10.44|9.70|9.57|
+
 ### End-to-end throughput and latency
 * Atom achieves up to 7.7x higher throughput with similar latency than `FP16` with a fixed GPU memory under serving scenario.
 ![e2e](figures/atom_e2e_eval.png)

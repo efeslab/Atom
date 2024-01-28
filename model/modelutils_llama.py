@@ -3,23 +3,14 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-from qLlamaLayer import QLlamaDecoderLayer, QLinearLayer
-from functools import partial
+from qLinearLayer import find_qlinear_layers
+from qLlamaLayer import QLlamaDecoderLayer
 from gptq import GPTQ, Quantizer_GPTQ
+from functools import partial
 
 from quant import quantize_activation_wrapper, quantize_attn_v_wrapper, quantize_attn_k_wrapper
 
-def find_qlinear_layers(module, name=''):
-    if type(module) == QLinearLayer:
-        return {name: module}
-    res = {}
-    for name1, child in module.named_children():
-        res.update(find_qlinear_layers(
-            child, name=name + '.' + name1 if name != '' else name1
-        ))
-    return res
-
-def reorder_model(model, device, args, reorder_index):
+def reorder_model_llama(model, device, args, reorder_index):
     model.config.use_cache = False
     layers = model.model.layers
     assert reorder_index is not None, "Reorder index is None"
@@ -85,7 +76,7 @@ def reorder_model(model, device, args, reorder_index):
         torch.cuda.empty_cache()
     return model
 
-def add_act_quant_wrapper(model, device, args, scales):
+def add_act_quant_wrapper_llama(model, device, args, scales):
     model.config.use_cache = False
     layers = model.model.layers
     for i in tqdm(range(len(layers))):
@@ -134,7 +125,7 @@ def add_act_quant_wrapper(model, device, args, scales):
         torch.cuda.empty_cache()
     return model
 
-def quantize_model(model, device, args):
+def quantize_model_llama(model, device, args):
     model.config.use_cache = False
     layers = model.model.layers
     for i in tqdm(range(len(layers))):
@@ -163,7 +154,7 @@ def quantize_model(model, device, args):
         torch.cuda.empty_cache()
     return model
 
-def quantize_model_gptq(model, device, args, dataloader):
+def quantize_model_gptq_llama(model, device, args, dataloader):
     print('Starting GPTQ quantization ...')
 
     use_cache = model.config.use_cache

@@ -171,49 +171,52 @@ def quantize_tensor(w: torch.tensor, n_bits, group_size, tiling, sym, clip_ratio
     return w.reshape(savedShape)
 
 @torch.no_grad()
-def quantize_activation_wrapper(w: torch.tensor, args) -> torch.tensor:
+def quantize_activation_wrapper(x: torch.tensor, args) -> torch.tensor:
     if args.abits >= 16:
-        return w
+        return x 
     
     qFunction = partial(
-        quantize_tensor, n_bits=args.abits, group_size=args.act_group_size, tiling=args.tiling, sym=args.a_sym,
+        quantize_tensor, 
+        n_bits=args.abits, 
+        group_size=args.act_group_size, 
+        tiling=args.tiling, 
+        sym=args.a_sym,
         clip_ratio=args.a_clip_ratio
     )
-    savedShape = w.shape
-    w = w.view(-1, savedShape[-1])
+
+    savedShape = x.shape
+    x = x.view(-1, savedShape[-1])
 
     assert args.act_group_size == 0 or (savedShape[-1]) % args.act_group_size == 0, "Group size should be divisible by (dim - keeper)."
 
     if args.keeper > 0:
-        saved_w = w[:, -args.keeper:].clone().contiguous()
+        saved_x = x[:, -args.keeper:].clone().contiguous()
     
     # Whether to keep outliers in FP8
     if args.keeper and args.keeper_precision > 0:
         assert args.keeper > 0, "Keeper must be greater than 0"
         if args.keeper_precision == 1:
-            saved_w = fake_quantize_quarter_E5M2(saved_w)
+            saved_x = fake_quantize_quarter_E5M2(saved_x)
         elif args.keeper_precision == 2:
-            saved_w = fake_quantize_quarter_E4M3(saved_w)
+            saved_x = fake_quantize_quarter_E4M3(saved_x)
         elif args.keeper_precision == 3:
-            saved_w = quantize_tensor(saved_w, n_bits=8, group_size=0, tiling=0, sym=True, exponential=False)
+            saved_x = quantize_tensor(saved_x, n_bits=8, group_size=0, tiling=0, sym=True, exponential=False)
 
     if args.keeper > 0:
-        w[:, -args.keeper:] = 0
-    w = qFunction(w)
+        x[:, -args.keeper:] = 0
+    x = qFunction(x)
     if args.keeper > 0:
-        w[:, -args.keeper:] = saved_w
-        del saved_w
+        x[:, -args.keeper:] = saved_x
+        del saved_x
 
-    return w.view(savedShape)
+    return x.view(savedShape)
 
 @torch.no_grad()
 def quantize_attn_v_wrapper(w: torch.tensor, args) -> torch.tensor:
     # Input shape: [bsz, self.num_heads, seq_len, self.head_dim]
     # Quantize on head_dim
-    assert w.dim() == 4 and w.shape[-1] == 128
-
-    if args.kv_cache == False:
-        return w
+    assert w.dim() == 4 or  w.dim() == 3
+    assert w.shape[-1] == 128
     
     head_dim = w.shape[-1]
     saved_shape = w.shape
@@ -228,10 +231,8 @@ def quantize_attn_v_wrapper(w: torch.tensor, args) -> torch.tensor:
 def quantize_attn_k_wrapper(w: torch.tensor, args) -> torch.tensor:
     # Input shape: [bsz, self.num_heads, seq_len, self.head_dim]
     # Quantize on head_dim
-    assert w.dim() == 4 and w.shape[-1] == 128
-
-    if args.kv_cache == False:
-        return w
+    assert w.dim() == 4 or  w.dim() == 3
+    assert w.shape[-1] == 128
     
     head_dim = w.shape[-1]
     saved_shape = w.shape

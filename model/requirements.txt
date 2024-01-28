@@ -1,5 +1,5 @@
 torch==2.1.0
-transformers==4.35.0
+transformers==4.36.2
 accelerate==0.24.1
 datasets==2.14.6
 zstandard==0.22.0
