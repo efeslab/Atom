@@ -4,11 +4,12 @@ import torch.nn as nn
 from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from qLinearLayer import find_qlinear_layers
+from qSVDLinearLayer import find_qSVDLinear_layers
 from qLlamaLayer import QLlamaDecoderLayer
 from gptq import GPTQ, Quantizer_GPTQ
 from functools import partial
 
-from quant import quantize_activation_wrapper, quantize_attn_v_wrapper, quantize_attn_k_wrapper
+from quant import quantize_activation_wrapper, quantize_attn_v_wrapper, quantize_attn_k_wrapper, quantize_low_rank_activation_wrapper
 
 def reorder_model_llama(model, device, args, reorder_index):
     model.config.use_cache = False
@@ -33,6 +34,7 @@ def reorder_model_llama(model, device, args, reorder_index):
             in_reorder_index=reorder_index[nameTemplate.format(i, 'mlp', 'gate_proj', 'input')],
             out_reorder_index=reorder_index[nameTemplate.format(i, 'mlp', 'down_proj', 'input')]
         )
+        
         m.mlp.up_proj.reorder(
             in_reorder_index=reorder_index[nameTemplate.format(i, 'mlp', 'up_proj', 'input')],
             out_reorder_index=reorder_index[nameTemplate.format(i, 'mlp', 'down_proj', 'input')]
@@ -70,6 +72,12 @@ def reorder_model_llama(model, device, args, reorder_index):
         )
         m.self_attn.register_buffer('reorder_index', reorder_index[nameTemplate.format(i, 'self_attn', 'o_proj', 'input')])
 
+        svd_linears = find_qSVDLinear_layers(m)
+        for name, svd_linear in svd_linears.items():
+            m_type, m_name = name.split('.')
+            svd_linear.reorder_rank_dim(reorder_index[f'layers.{i}.{m_type}.{m_name}.ALinear.input'])    
+            
+        
         layers[i] = layers[i].cpu()
         layers[i] = m.cpu()
         del m
@@ -121,8 +129,17 @@ def add_act_quant_wrapper_llama(model, device, args, scales):
             scales[nameTemplate.format(i, 'mlp', 'gate_proj')]
         )
         
+        all_svd_linear_layers = find_qSVDLinear_layers(m)
+        for name, qsvd_linear in all_svd_linear_layers.items():
+            qsvd_linear.configure(
+                partial(quantize_low_rank_activation_wrapper, args=args),
+                None
+            )
+        
         layers[i] = m.cpu()
         torch.cuda.empty_cache()
+    
+    
     return model
 
 def quantize_model_llama(model, device, args):

@@ -25,7 +25,7 @@ class QLinearLayer(nn.Module):
             self.register_buffer('bias', originalLayer.bias)
         else:
             self.bias = None
-        
+            
     @torch.no_grad()
     def forward(self, x):
         y = torch.functional.F.linear(x, self.weight, self.bias)

@@ -170,6 +170,40 @@ def quantize_tensor(w: torch.tensor, n_bits, group_size, tiling, sym, clip_ratio
     
     return w.reshape(savedShape)
 
+
+@torch.no_grad()
+def quantize_low_rank_activation_wrapper(x: torch.tensor, args) -> torch.tensor:
+    if args.abits >= 16:
+        return x 
+    
+    qFunction = partial(
+        quantize_tensor, 
+        n_bits=args.abits, 
+        group_size=args.act_group_size, 
+        tiling=0, 
+        sym=args.a_sym,
+        clip_ratio=args.a_clip_ratio
+    )
+
+    savedShape = x.shape
+    x = x.view(-1, savedShape[-1])
+
+    assert args.act_group_size == 0 or (savedShape[-1]) % args.act_group_size == 0, "Group size should be divisible by (dim - keeper)."
+    if args.keeper > 0:
+        saved_x = x[:, -128:].clone().contiguous()
+        saved_x = quantize_tensor(saved_x, n_bits=8, group_size=0, tiling=0, sym=True, exponential=False)
+        x[:, -128:] = 0
+    
+    x = qFunction(x)
+    
+    if args.keeper > 0:
+        x[:, -128:] = saved_x
+        del saved_x
+    
+    return x.view(savedShape)
+
+
+
 @torch.no_grad()
 def quantize_activation_wrapper(x: torch.tensor, args) -> torch.tensor:
     if args.abits >= 16:

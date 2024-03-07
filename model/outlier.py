@@ -4,6 +4,7 @@ import functools
 import math
 from tqdm import tqdm
 from qLlamaLayer import QLinearLayer
+from svd_llama import ASVDLinear
 
 @torch.no_grad()
 def get_act_stats_llama(model, dataloader, device_, metric='hessian'):
@@ -43,7 +44,13 @@ def get_act_stats_llama(model, dataloader, device_, metric='hessian'):
 
     hooks = []
     for name, m in model.model.named_modules():
-        if isinstance(m, nn.Linear):
+        # if 'ALinear' in name or 'BLinear' in name:
+        #     continue
+        
+        if 'BLinear' in name:
+            continue
+        
+        if isinstance(m, (nn.Linear, ASVDLinear)):
             hooks.append(
                 m.register_forward_hook(
                     functools.partial(stat_input_hook, name=name)
@@ -230,7 +237,10 @@ def get_reorder_index(model, act_scales):
         return torch.cat(index_slices).contiguous()
     
     for name, m in model.model.named_modules():
-        if isinstance(m, nn.Linear):
+        #if 'ALinear' in name or 'BLinear' in name:
+        if 'BLinear' in name:
+            continue
+        if isinstance(m, (nn.Linear, ASVDLinear)):
             m.name = name
 
             # Reorder Index of each layer's input

@@ -13,6 +13,18 @@ from lm_eval import tasks as lm_tasks
 from lm_eval import evaluator as lm_evaluator
 
 
+def get_svd_llama(model):
+    import torch
+    def skip(*args, **kwargs):
+        pass
+    torch.nn.init.kaiming_uniform_ = skip
+    torch.nn.init.uniform_ = skip
+    torch.nn.init.normal_ = skip
+    from svd_llama import ASVDLlamaForCausalLM
+    model = ASVDLlamaForCausalLM.from_pretrained(model, torch_dtype=torch.float16, trust_remote_code=True)
+    model.seqlen = 2048
+    return model
+
 def get_llama(model):
     import torch
     def skip(*args, **kwargs):
@@ -21,7 +33,7 @@ def get_llama(model):
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
     from transformers import LlamaForCausalLM
-    model = LlamaForCausalLM.from_pretrained(model, torch_dtype=torch.float16)
+    model = LlamaForCausalLM.from_pretrained(model, torch_dtype=torch.float16,  trust_remote_code=True)
     model.seqlen = 2048
     return model
 
@@ -175,8 +187,16 @@ if __name__ == '__main__':
 
     model_name = args.model.lower().split('/')[-1]
     assert model_name != None, "Please check the model path."
-
-    if "llama" in args.model.lower():
+    if "svd" in args.model.lower() and "llama" in args.model.lower():
+        print("SVD version")
+        model = get_svd_llama(args.model)
+        get_act_stats_func = get_act_stats_llama
+        reorder_model_func = reorder_model_llama
+        add_act_quant_wrapper_func = add_act_quant_wrapper_llama
+        quantize_model_gptq_func = quantize_model_gptq_llama
+        quantize_model_func = quantize_model_llama
+        eval_func = llama_eval
+    elif "llama" in args.model.lower():
         model = get_llama(args.model)
         get_act_stats_func = get_act_stats_llama
         reorder_model_func = reorder_model_llama
@@ -198,6 +218,7 @@ if __name__ == '__main__':
 
     if args.reorder:
         if args.cache_index == False:
+            
             dataloader, testloader = get_loaders(
                 args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
@@ -206,6 +227,8 @@ if __name__ == '__main__':
                 model, dataloader, DEV, metric=args.act_sort_metric
             )
 
+            torch.save(act_scales, f'{args.save_dir}/{model_name}_act_scale_{args.dataset}.pt')
+            
             print("Getting reording index...")
             reorder_index = get_reorder_index(model, act_scales)
 
@@ -241,8 +264,8 @@ if __name__ == '__main__':
 
 
     if args.eval_ppl:
-        datasets = ['wikitext2', 'ptb', 'c4']
-
+        #datasets = ['wikitext2', 'ptb', 'c4']
+        datasets = ['wikitext2']
         for dataset in datasets:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen

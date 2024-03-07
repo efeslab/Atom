@@ -5,6 +5,7 @@ import math
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, LlamaRMSNorm, LlamaAttention, LlamaMLP
 from quant import Quantizer, fake_quantize_quarter_E5M2, fake_quantize_quarter_E4M3, quantize_tensor, quantize_tensor_channel_group
 from qLinearLayer import QLinearLayer
+from qSVDLinearLayer import QSVDLinearLayer
 
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
@@ -184,22 +185,49 @@ class QLlamaAttention(nn.Module):
                 f" and `num_heads`: {self.num_heads})."
             )
         
-        self.q_proj = QLinearLayer(
-            originalAttn.q_proj,
-            args
-        )
-        self.k_proj = QLinearLayer(
-            originalAttn.k_proj,
-            args
-        )
-        self.v_proj = QLinearLayer(
-            originalAttn.v_proj,
-            args
-        )
-        self.o_proj = QLinearLayer(
-            originalAttn.o_proj,
-            args
-        )
+        if isinstance(originalAttn.q_proj, nn.Linear):
+            self.q_proj = QLinearLayer(
+                originalAttn.q_proj,
+                args
+            )
+        else:
+            self.q_proj = QSVDLinearLayer(
+                originalAttn.q_proj,
+                args
+            )
+            
+        if isinstance(originalAttn.k_proj, nn.Linear):
+            self.k_proj = QLinearLayer(
+                originalAttn.k_proj,
+                args
+            )
+        else:
+            self.k_proj = QSVDLinearLayer(
+                originalAttn.k_proj,
+                args
+            )
+        
+        if isinstance(originalAttn.v_proj, nn.Linear):
+            self.v_proj = QLinearLayer(
+                originalAttn.v_proj,
+                args
+            )
+        else:
+            self.v_proj = QSVDLinearLayer(
+                originalAttn.v_proj,
+                args
+            )
+        
+        if isinstance(originalAttn.o_proj, nn.Linear):
+            self.o_proj = QLinearLayer(
+                originalAttn.o_proj,
+                args
+            )
+        else:
+            self.o_proj = QSVDLinearLayer(
+                originalAttn.o_proj,
+                args
+            )
         self.rotary_emb = originalAttn.rotary_emb
         self.act_quant = Quantizer(args=args)
         self.v_quant = Quantizer(args=args)
@@ -316,18 +344,40 @@ class QLlamaMLP(nn.Module):
         args
     ):
         super().__init__()
-        self.gate_proj = QLinearLayer(
-            originalMLP.gate_proj,
-            args
-        )
-        self.down_proj = QLinearLayer(
-            originalMLP.down_proj,
-            args
-        )
-        self.up_proj = QLinearLayer(
-            originalMLP.up_proj,
-            args
-        )
+        # gate_proj
+        if isinstance(originalMLP.gate_proj, nn.Linear):
+            self.gate_proj = QLinearLayer(
+                originalMLP.gate_proj,
+                args
+            )
+        else:
+            self.gate_proj = QSVDLinearLayer(
+                originalMLP.gate_proj,
+                args
+            )
+        # down_proj
+        if isinstance(originalMLP.down_proj, nn.Linear):
+            self.down_proj = QLinearLayer(
+                originalMLP.down_proj,
+                args
+            )
+        else:
+            self.down_proj = QSVDLinearLayer(
+                originalMLP.down_proj,
+                args
+            )
+        # up_proj
+        if isinstance(originalMLP.up_proj, nn.Linear):
+            self.up_proj = QLinearLayer(
+                originalMLP.up_proj,
+                args
+            )
+        else:
+            self.up_proj = QSVDLinearLayer(
+                originalMLP.up_proj,
+                args
+            )
+            
         self.act_fn = originalMLP.act_fn
         self.act_quant = Quantizer(args=args)
         # self.register_buffer("act_shifts", None)
