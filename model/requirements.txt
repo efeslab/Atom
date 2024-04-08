@@ -12,3 +12,4 @@ omegaconf==2.3.0
 pycountry==22.3.5
 rouge-score==0.1.2
 lm-eval==0.3.0
+bitsandbytes=0.43.0

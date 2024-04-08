@@ -5,16 +5,18 @@
 
 Atom is an accurate low-bit weight-activation quantization algorithm that combines (1) mixed-precision, (2) fine-grained group quantization, (3) dynamic activation quantization, (4) KV-cache quantization, and (5) efficient CUDA kernels co-design. 
 
-This codebase utilizes [lm_eval](https://github.com/EleutherAI/lm-evaluation-harness.git) to evaluate perplexity and zero-shot accuracy on Llama models. And code segments from [SmoothQuant](https://github.com/mit-han-lab/smoothquant.git), [GPTQ](https://github.com/IST-DASLab/gptq.git), and [SparseGPT](https://github.com/IST-DASLab/sparsegpt.git) are integrated to reproduce results. Our kernels are modified based on previous version of [FlashInfer](https://github.com/flashinfer-ai/flashinfer) and tested by [NVBench](https://github.com/NVIDIA/nvbench/tree/main). Serving framework [Punica](https://github.com/punica-ai/punica) is integrated to evaluate end-to-end throughput and latency.
+This codebase utilizes [lm_eval](https://github.com/EleutherAI/lm-evaluation-harness.git) to evaluate perplexity and zero-shot accuracy. Code segments from [SmoothQuant](https://github.com/mit-han-lab/smoothquant.git), [GPTQ](https://github.com/IST-DASLab/gptq.git), and [SparseGPT](https://github.com/IST-DASLab/sparsegpt.git) are integrated to reproduce results. Our kernels are modified based on previous version of [FlashInfer](https://github.com/flashinfer-ai/flashinfer) and tested by [NVBench](https://github.com/NVIDIA/nvbench/tree/main). Serving framework [Punica](https://github.com/punica-ai/punica) is integrated to evaluate end-to-end throughput and latency. We also use [BitsandBytes](https://github.com/TimDettmers/bitsandbytes) for new data-type evaluations (e.g., FP4). We thank the authors for their great works.
 
 The current release features:
-* Simulated quantization process for accuracy evaluation.
+* Simulated quantization for accuracy evaluation.
 * Perplexity and zero-shot accuracy evaluation
-* Kernel & End-to-end evaluation
+* Kernel benchmark & End-to-end evaluation
 
 To do:
 - [x] Release code for reproducing results.
 - [x] Release code for end-to-end throughput evaluation.
+- [x] Add FP4 accuracy evaluation for both weight and activation quantization.
+- [ ] Add support for Mixtral models.
 - [ ] Optimize kernel for different GPUs.
 - [ ] Full inference workflow in real production scenario.
 
@@ -62,7 +64,7 @@ make -j
 ## Usage
 ### Accuracy Evaluation
 Before running this command, please download Llama model from [Hugging Face website](https://huggingface.co/models?sort=trending&search=llama) first.
-We recommend downloading from [HuggyLlama](https://huggingface.co/huggyllama).
+We recommend downloading from [Deca-Llama](https://huggingface.co/linhvu/decapoda-research-llama-7b-hf/tree/main).
 
 We provide several scripts to reproduce our results in the paper:
 
@@ -93,7 +95,7 @@ python model/llama.py /Path/To/Llama/Model wikitext2 \
     --eval_ppl --eval_common_sense
 ```
 ### Efficiency Evaluation
-We evaluate Atom on a RTX4090 GPU. Results below are executed in [cu113](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-052b3b515d9653f9c6e358e5b70f8bb9d75c17a8b2039055674dfa7caa970791?context=explore) docker container.
+We evaluate Atom on a RTX4090 GPU. Results below are executed in [cu113](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-052b3b515d9653f9c6e358e5b70f8bb9d75c17a8b2039055674dfa7caa970791?context=explore) docker container. Note that current kernels are only optimized for RTX4090.
 
 To get INT4 GEMM kernel result, please execute:
 ```
@@ -108,9 +110,10 @@ Other kernel of Atom can be evaluated similarly, for e.g., `./bench_reorder`. We
 To reproduce end-to-end throughput and latency evaluation, please check [e2e/README.md](./e2e/README.md).
 ## Key Results
 ### Perplexity
-* Atom achieves strong perplexity results across WikiText2, PTB and C4 datasets across on Llama models family.
+We evaluate Atom's accuracy on serveral model families, including Llama, Llama-2, and OPT.
+* WikiText2, PTB and C4 datasets on Llama family:
 ![perplexity](figures/atom_ppl.png)
-* Below is Atom's WikiText2 perplexity of OPT, comparing with SmoothQuant and OmniQuant. Note that for OPT-66B, Atom's result is without using GPTQ optimization.
+* WikiText2 comparing with SmoothQuant and OmniQuant on OPT:
 
 |#Bit|Method|OPT-6.7B|OPT-13B|OPT-30B|OPT-66B|
 |-|-|-|-|-|-|
@@ -124,7 +127,7 @@ To reproduce end-to-end throughput and latency evaluation, please check [e2e/REA
 ![e2e](figures/atom_e2e_eval.png)
 
 ## Reference
-If you find Atom is helpful to your research, please consider to cite our paper:
+If you find this project is helpful to your research, please consider to cite our paper:
 ```
 @article{zhao2023atom,
   title={Atom: Low-bit Quantization for Efficient and Accurate LLM Serving},

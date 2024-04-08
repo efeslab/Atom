@@ -65,7 +65,8 @@ class QLinearLayer(nn.Module):
             group_size=self.args.weight_group_size,
             channel_group=self.args.weight_channel_group,
             clip_ratio=self.args.w_clip_ratio,
-            tiling=self.args.tiling
+            tiling=self.args.tiling,
+            quant_type=self.args.quant_type
         )
 
         if self.args.keeper > 0:
