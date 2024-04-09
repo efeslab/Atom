@@ -85,7 +85,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--exponential', action='store_true',
-        help='Whether to use exponential-only for weight quantization.'
+        help='Whether to use exponent-only for weight quantization.'
     )
     parser.add_argument(
         '--a_sym', action='store_true',
@@ -182,6 +182,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save_dir', type=str, default='./saved',
         help='Path to store the reordering indices and quantized weights.'
+    )
+    parser.add_argument(
+        '--quant_type', type=str, default='int', choices=['int', 'fp'],
+        help='Determine the mapped data format by quant_type + n_bits. e.g. int8, fp4.'
     )
     
     args = parser.parse_args()

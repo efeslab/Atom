@@ -29,6 +29,7 @@ def llama_eval(model, testenc, dev):
         def __init__(self, module):
             super().__init__()
             self.module = module
+            self.self_attn = module.self_attn
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp
             cache['i'] += 1

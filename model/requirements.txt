@@ -1,5 +1,5 @@
 torch==2.1.0
-transformers==4.36.2
+transformers==4.39.0
 accelerate==0.24.1
 datasets==2.14.6
 zstandard==0.22.0
@@ -12,3 +12,4 @@ omegaconf==2.3.0
 pycountry==22.3.5
 rouge-score==0.1.2
 lm-eval==0.3.0
+bitsandbytes==0.43.0
