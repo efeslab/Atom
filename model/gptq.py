@@ -271,7 +271,7 @@ class GPTQ:
         # print('error', torch.sum(Losses).item())
         
         if self.n_out > 0:
-            keep_w = W[:,self.n_nonout:]
+            keep_w = W[:,self.n_nonout:].contiguous()
 
             if self.keeper_precision > 0:
                 if self.keeper_precision == 1:
