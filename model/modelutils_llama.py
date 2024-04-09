@@ -231,7 +231,8 @@ def quantize_model_gptq_llama(model, device, args, dataloader):
                 gptq[name].quantizer.configure(
                     args.wbits, perchannel=True, sym=args.w_sym, mse=False, 
                     channel_group=args.weight_channel_group,
-                    clip_ratio=args.w_clip_ratio
+                    clip_ratio=args.w_clip_ratio,
+                    quant_type=args.quant_type
                 )
                 
             def add_batch(name):
