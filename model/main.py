@@ -21,7 +21,7 @@ def get_llama(model):
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
     from transformers import LlamaForCausalLM
-    model = LlamaForCausalLM.from_pretrained(model, torch_dtype=torch.float16, device_map="auto")
+    model = LlamaForCausalLM.from_pretrained(model, torch_dtype=torch.float16)
     model.seqlen = 2048
     return model
 
@@ -33,7 +33,7 @@ def get_opt(model):
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
     from transformers import OPTForCausalLM
-    model = OPTForCausalLM.from_pretrained(model, torch_dtype=torch.float16, device_map="auto")
+    model = OPTForCausalLM.from_pretrained(model, torch_dtype=torch.float16)
     model.seqlen = model.config.max_position_embeddings
     return model
 

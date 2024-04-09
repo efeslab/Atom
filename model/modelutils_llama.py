@@ -18,7 +18,6 @@ def reorder_model_llama(model, device, args, reorder_index):
 
     for i in tqdm(range(len(layers))):
         layers[i] = layers[i].to(device)
-        layers[i] = layers[i].to(device)
         if isinstance(layers[i], LlamaDecoderLayer):
             m = QLlamaDecoderLayer(
                 originalLayer=layers[i],
@@ -176,6 +175,7 @@ def quantize_model_gptq_llama(model, device, args, dataloader):
         def __init__(self, module):
             super().__init__()
             self.module = module
+            self.self_attn = module.self_attn
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp
             cache['i'] += 1
@@ -231,7 +231,8 @@ def quantize_model_gptq_llama(model, device, args, dataloader):
                 gptq[name].quantizer.configure(
                     args.wbits, perchannel=True, sym=args.w_sym, mse=False, 
                     channel_group=args.weight_channel_group,
-                    clip_ratio=args.w_clip_ratio
+                    clip_ratio=args.w_clip_ratio,
+                    quant_type=args.quant_type
                 )
                 
             def add_batch(name):

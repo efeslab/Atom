@@ -72,6 +72,7 @@ class QLinearLayer(nn.Module):
         if self.args.keeper > 0:
             self.weight[:, -self.args.keeper:] = saved_w
             del saved_w
+        return
     
     def reorder(self, in_reorder_index, out_reorder_index=None):
         if self.args.reorder == True:
@@ -80,3 +81,4 @@ class QLinearLayer(nn.Module):
             if out_reorder_index is not None:
                 out_reorder_index = out_reorder_index.to(self.weight.device)
                 self.weight = torch.index_select(self.weight, 0, out_reorder_index)
+        return
