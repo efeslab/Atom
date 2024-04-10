@@ -12,11 +12,19 @@ import transformers
 
 from qLlamaLayer import QLinearLayer
 from quant import quantize_tensor, fake_quantize_quarter_E5M2, fake_quantize_quarter_E4M3
+from bitsandbytes.functional import quantize_fp4, dequantize_fp4
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-def quantize_gptq(x, scale, zero, maxq, channel_group):
+# Tool function adopted from GPTQ Codebase
+# Modifed for continous channel weight quant and non-uniform quantization
+# x: Input Tensor. Most likely x.shape[1] == 1
+# scale: Specified scales. Calculated by (2*absmax) / maxq
+# zero: Specified zero points. Calculated by -xmin / scale
+# maxq: mapped data width
+# channel_group: number of channel group quantized together
+def quantize_gptq(x, scale, zero, maxq, channel_group, quant_type="int"):
     if maxq < 0:
         return (x > scale / 2).float() * scale + (x < zero / 2).float() * zero
     shape = x.shape
@@ -24,8 +32,31 @@ def quantize_gptq(x, scale, zero, maxq, channel_group):
         assert len(shape) == 2, "only support 2D input when using multilple channel group"
         shape = x.shape
         x = x.reshape((int(x.shape[0]/channel_group), -1))
-    q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
-    q = scale * (q - zero)
+    # x's layout: [num_groups, group_size]
+    if quant_type == "int":
+        # Uniform affine mapping
+        q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
+        q = scale * (q - zero)
+    else:
+        assert quant_type == "fp", "Currently only support [int, fp]."
+        cur_group_size = x.shape[1]
+        appended_group_size = 64 - cur_group_size
+        assert appended_group_size >= 0, "The least blocksize supported by BNB is 64."
+        # first use specified metadata for quantization
+        x = torch.clamp(x / scale, -maxq / 2, maxq / 2)
+        # Append useless data for ensuring bnb will use scale = 1
+        # Basically using bnb quantization kernels as rounding kernel
+        x = torch.cat(
+            [x,
+             torch.ones(x.shape[0], appended_group_size, device=x.device, dtype=x.dtype) * maxq / 2
+            ], 
+            dim=1
+        ).contiguous()
+        real_quantize_x, quant_metadata = quantize_fp4(x, blocksize=x.shape[1])
+        q = dequantize_fp4(real_quantize_x, quant_metadata)
+        # dequantize after rounding
+        q = q[:, :cur_group_size].contiguous() * scale
+        del real_quantize_x, quant_metadata
     return q.reshape(shape)
 
 class Quantizer_GPTQ(nn.Module):
@@ -40,9 +71,18 @@ class Quantizer_GPTQ(nn.Module):
         bits, perchannel=False, channel_group=1, sym=True, 
         mse=False, norm=2.4, grid=100, maxshrink=.8,
         clip_ratio=1.0,
-        trits=False
+        trits=False,
+        quant_type="int"
     ):
-        self.maxq = torch.tensor(2 ** bits - 1)
+        if quant_type == "int":
+            # Uniform quantization. Width is 2^bits - 1
+            self.maxq = torch.tensor(2 ** bits - 1)
+        else:
+            # Ref: https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+            # [0, 0.0625, 8.0, 12.0, 4.0, 6.0, 2.0, 3.0]
+            assert quant_type == "fp", "Currently only support [int, fp]."
+            self.maxq = torch.tensor(2 * 12.0, dtype=torch.float32)
+
         self.perchannel = perchannel
         self.channel_group = channel_group
         if self.channel_group > 1:
@@ -53,6 +93,7 @@ class Quantizer_GPTQ(nn.Module):
         self.grid = grid
         self.maxshrink = maxshrink 
         self.clip_ratio = clip_ratio
+        self.quant_type = quant_type
         if trits:
             self.maxq = torch.tensor(-1) 
 
@@ -145,7 +186,7 @@ class Quantizer_GPTQ(nn.Module):
 
     def quantize(self, x):
         if self.ready():
-            return quantize_gptq(x, self.scale, self.zero, self.maxq, self.channel_group)
+            return quantize_gptq(x, self.scale, self.zero, self.maxq, self.channel_group, self.quant_type)
         return x
 
     def enabled(self):
@@ -209,9 +250,7 @@ class GPTQ:
         if isinstance(self.layer, transformers.Conv1D):
             W = W.t()
         W = W.float()
-        
-        tick = time.time()
-        
+                
         if not self.quantizer.ready():
             self.quantizer.find_params(W[:,:self.n_nonout], weight=True)
 
@@ -252,7 +291,8 @@ class GPTQ:
                     if (i1 + i) % groupsize == 0:
                         self.quantizer.find_params(W[:, (i1 + i):min((i1 + i + groupsize), self.n_nonout)], weight=True)
                 q = quantize_gptq(
-                    w.unsqueeze(1), self.quantizer.scale, self.quantizer.zero, self.quantizer.maxq, self.quantizer.channel_group
+                    w.unsqueeze(1), self.quantizer.scale, self.quantizer.zero,
+                    self.quantizer.maxq, self.quantizer.channel_group, self.quantizer.quant_type
                 ).flatten()
                 Q1[:, i] = q
                 Losses1[:, i] = (w - q) ** 2 / d ** 2
