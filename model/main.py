@@ -6,7 +6,7 @@ from collections import defaultdict
 from pprint import pprint
 from modelutils_llama import quantize_model_llama, reorder_model_llama, quantize_model_gptq_llama,  add_act_quant_wrapper_llama
 from modelutils_opt import quantize_model_opt, reorder_model_opt, quantize_model_gptq_opt,  add_act_quant_wrapper_opt
-from modelutils_mixtral import quantize_model_mixtral, add_act_quant_wrapper_mixtral
+from modelutils_mixtral import quantize_model_mixtral, add_act_quant_wrapper_mixtral, reorder_model_mixtral
 from parallel_utils import map_layers_to_multi_gpus
 from LMClass import LMClass
 from eval import pattern_match
@@ -211,10 +211,10 @@ if __name__ == '__main__':
         eval_func = opt_eval
     elif "mixtral" in args.model.lower():
         model = get_mixtral(args.model)
-        # get_act_stats_func = get_act_stats_mixtral
-        # reorder_model_func = reorder_model_mixtral
+        get_act_stats_func = get_act_stats_llama
+        reorder_model_func = reorder_model_mixtral
         add_act_quant_wrapper_func = add_act_quant_wrapper_mixtral
-        # quantize_model_gptq_func = quantize_model_gptq_mixtral
+        quantize_model_gptq_func = quantize_model_gptq_llama
         quantize_model_func = quantize_model_mixtral
         eval_func = llama_eval
     model.eval()

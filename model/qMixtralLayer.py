@@ -63,7 +63,6 @@ class QMixtralRMSNorm(nn.Module):
     ):
         super().__init__()
         self.originalRMSNorm = originalRMSNorm
-        self.act_quant = lambda x: x
         self.register_buffer("reorder_index", None)
         self.args = args
 
@@ -73,9 +72,6 @@ class QMixtralRMSNorm(nn.Module):
         if self.reorder_index is not None:
             assert result.shape[result.dim()-1] == self.reorder_index.shape[0]
             result = torch.index_select(result, result.dim()-1, self.reorder_index)
-
-        if self.args.abits < 16:
-            result = self.act_quant(result)
 
         return result
     
@@ -226,6 +222,10 @@ class QMixtralAttention(nn.Module):
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
 
+        # Reorder the BMM output to feed into o.proj
+        if self.reorder_index is not None:
+            attn_output = torch.index_select(attn_output, 2, self.reorder_index)
+
         attn_output = self.act_quant(attn_output)
         attn_output = self.o_proj(attn_output)
 
@@ -282,9 +282,11 @@ class QMixtralSparseMoeBlock(nn.Module):
         self.ffn_dim = originalMoeBlock.ffn_dim
         self.num_experts = originalMoeBlock.num_experts
         self.top_k = originalMoeBlock.top_k
+        self.args = args
+        self.act_quant = lambda x: x
 
         # gating
-        self.gate = originalMoeBlock.gate
+        self.gate = QLinearLayer(originalMoeBlock.gate, args, enable_quant=False)
 
         self.experts = nn.ModuleList(
             [QMixtralBlockSparseTop2MLP(originalMoeBlock.experts[i], args) for i in range(self.num_experts)]
@@ -304,6 +306,10 @@ class QMixtralSparseMoeBlock(nn.Module):
         # router_logits: (batch * sequence_length, n_experts)
         router_logits = self.gate(hidden_states)
 
+        # quantize activations after the MoE gate
+        if self.args.abits < 16:
+            hidden_states = self.act_quant(hidden_states)
+
         routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)
         routing_weights, selected_experts = torch.topk(routing_weights, self.top_k, dim=-1)
         routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
@@ -321,6 +327,7 @@ class QMixtralSparseMoeBlock(nn.Module):
         # Loop over all available experts in the model and perform the computation on each expert
         for expert_idx in range(self.num_experts):
             expert_layer = self.experts[expert_idx]
+
             idx, top_x = torch.where(expert_mask[expert_idx])
 
             if top_x.shape[0] == 0:
@@ -352,6 +359,7 @@ class QMixtralDecoderLayer(nn.Module):
         super().__init__()
         self.args = args
         self.hidden_size = originalLayer.hidden_size
+        self.act_quant = lambda x: x
 
         self.self_attn = QMixtralAttention(originalLayer.self_attn, args)
 
@@ -403,6 +411,9 @@ class QMixtralDecoderLayer(nn.Module):
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
+        # quantize activations before feed it to the attention module
+        if self.args.abits < 16:
+            hidden_states = self.act_quant(hidden_states)
 
         # Self Attention
         hidden_states, self_attn_weights, present_key_value = self.self_attn(

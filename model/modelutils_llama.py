@@ -3,8 +3,10 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+from transformers.models.mixtral.modeling_mixtral import MixtralDecoderLayer
 from qLinearLayer import find_qlinear_layers
 from qLlamaLayer import QLlamaDecoderLayer
+from qMixtralLayer import QMixtralDecoderLayer
 from gptq import GPTQ, Quantizer_GPTQ
 from functools import partial
 
@@ -44,15 +46,12 @@ def reorder_model_llama(model, device, args, reorder_index):
         # Not reorder due to the RoPE embedding.
         m.self_attn.q_proj.reorder(
             in_reorder_index=reorder_index[nameTemplate.format(i, 'self_attn', 'q_proj', 'input')],
-            # out_reorder_index=reorder_index[nameTemplate.format(i, 'self_attn', 'k_proj', 'output')]
             out_reorder_index=None
         )
         m.self_attn.k_proj.reorder(
             in_reorder_index=reorder_index[nameTemplate.format(i, 'self_attn', 'k_proj', 'input')],
-            # out_reorder_index=reorder_index[nameTemplate.format(i, 'self_attn', 'k_proj', 'output')]
             out_reorder_index=None
         )
-        
         m.self_attn.v_proj.reorder(
             in_reorder_index=reorder_index[nameTemplate.format(i, 'self_attn', 'v_proj', 'input')],
             out_reorder_index=None
@@ -201,16 +200,19 @@ def quantize_model_gptq_llama(model, device, args, dataloader):
 
     quantizers = {}
     for i in tqdm(range(len(layers))):
-        m = None
         if isinstance(layers[i], LlamaDecoderLayer):
             m = QLlamaDecoderLayer(
                 originalLayer=layers[i],
                 args=args,
             )
-        elif isinstance(layers[i], QLlamaDecoderLayer):
+        elif isinstance(layers[i], MixtralDecoderLayer):
+            m = QMixtralDecoderLayer(
+                originalLayer=layers[i],
+                args=args,
+            )
+        elif isinstance(layers[i], QLlamaDecoderLayer) or isinstance(layers[i], QMixtralDecoderLayer):
             m = layers[i]
-
-        if m is None:
+        else:
             continue
 
         layer = m.to(device)

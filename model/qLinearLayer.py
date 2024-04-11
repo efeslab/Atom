@@ -4,7 +4,8 @@ from quant import fake_quantize_quarter_E5M2, fake_quantize_quarter_E4M3, quanti
 
 def find_qlinear_layers(module, name=''):
     if type(module) == QLinearLayer:
-        return {name: module}
+        if module.enable_quant:
+            return {name: module}
     res = {}
     for name1, child in module.named_children():
         res.update(find_qlinear_layers(
@@ -16,11 +17,13 @@ class QLinearLayer(nn.Module):
     def __init__(
         self,
         originalLayer: nn.Linear,
-        args
+        args,
+        enable_quant: bool = True
     ):
         super().__init__()
         self.args = args
         self.register_buffer('weight', originalLayer.weight)
+        self.enable_quant = enable_quant # whether to allow quant on weights, default True
         if originalLayer.bias is not None:
             self.register_buffer('bias', originalLayer.bias)
         else:
