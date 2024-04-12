@@ -6,6 +6,7 @@ from collections import defaultdict
 from pprint import pprint
 from modelutils_llama import quantize_model_llama, reorder_model_llama, quantize_model_gptq_llama,  add_act_quant_wrapper_llama
 from modelutils_opt import quantize_model_opt, reorder_model_opt, quantize_model_gptq_opt,  add_act_quant_wrapper_opt
+from modelutils_mixtral import quantize_model_mixtral, add_act_quant_wrapper_mixtral, reorder_model_mixtral
 from parallel_utils import map_layers_to_multi_gpus
 from LMClass import LMClass
 from eval import pattern_match
@@ -35,6 +36,18 @@ def get_opt(model):
     from transformers import OPTForCausalLM
     model = OPTForCausalLM.from_pretrained(model, torch_dtype=torch.float16)
     model.seqlen = model.config.max_position_embeddings
+    return model
+
+def get_mixtral(model):
+    import torch
+    def skip(*args, **kwargs):
+        pass
+    torch.nn.init.kaiming_uniform_ = skip
+    torch.nn.init.uniform_ = skip
+    torch.nn.init.normal_ = skip
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.float16)
+    model.seqlen = 2048
     return model
 
 
@@ -196,6 +209,14 @@ if __name__ == '__main__':
         quantize_model_gptq_func = quantize_model_gptq_opt
         quantize_model_func = quantize_model_opt
         eval_func = opt_eval
+    elif "mixtral" in args.model.lower():
+        model = get_mixtral(args.model)
+        get_act_stats_func = get_act_stats_llama
+        reorder_model_func = reorder_model_mixtral
+        add_act_quant_wrapper_func = add_act_quant_wrapper_mixtral
+        quantize_model_gptq_func = quantize_model_gptq_llama
+        quantize_model_func = quantize_model_mixtral
+        eval_func = llama_eval
     model.eval()
 
     import os
@@ -265,7 +286,7 @@ if __name__ == '__main__':
             param.requires_grad = False
 
         if args.multigpu:
-            if "llama" in args.model.lower():
+            if ("llama" in args.model.lower()) or ("mixtral" in args.model.lower()):
                 map_layers_to_multi_gpus(lm.model.model.layers)
                 input_device = lm.model.model.layers[0].device
                 output_device = lm.model.model.layers[-1].device

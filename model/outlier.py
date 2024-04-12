@@ -52,7 +52,8 @@ def get_act_stats_llama(model, dataloader, device_, metric='hessian'):
 
     layers = model.model.layers
     model.model.embed_tokens = model.model.embed_tokens.to(device)
-    model.model.norm = model.model.norm.to(device)
+    if not model.model.norm.weight.is_meta:
+        model.model.norm = model.model.norm.to(device)
     layers[0] = layers[0].to(device)
 
     dtype = next(iter(model.parameters())).dtype
@@ -65,6 +66,7 @@ def get_act_stats_llama(model, dataloader, device_, metric='hessian'):
         def __init__(self, module):
             super().__init__()
             self.module = module
+            self.self_attn = module.self_attn
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp.squeeze(0)
             cache['i'] += 1
@@ -82,7 +84,8 @@ def get_act_stats_llama(model, dataloader, device_, metric='hessian'):
     layers[0] = layers[0].module
     layers[0] = layers[0].cpu()
     model.model.embed_tokens = model.model.embed_tokens.cpu()
-    model.model.norm = model.model.norm.cpu()
+    if not model.model.norm.weight.is_meta:
+        model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
