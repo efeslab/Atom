@@ -1,5 +1,5 @@
 # Atom: Low-bit Quantization for Efficient and Accurate LLM Serving
-[[paper](https://arxiv.org/abs/2310.19102)] [[slides](./figures/Atom_talk_yilong.pdf)]
+[[paper](https://arxiv.org/abs/2310.19102)] [[slides](./figures/atom_mlsys_slides.pdf)]  [[poster](./figures/atom_mlsys_poster.pdf)]
 
 ![overview](figures/overview_and_ppl.png)
 
@@ -16,7 +16,7 @@ To do:
 - [x] Release code for reproducing results.
 - [x] Release code for end-to-end throughput evaluation.
 - [x] Add FP4 accuracy evaluation for both weight and activation quantization.
-- [ ] Add support for Mixtral models.
+- [x] Add support for Mixtral models.
 - [ ] Optimize kernel for different GPUs.
 - [ ] Full inference workflow in real production scenario.
 
@@ -110,17 +110,12 @@ Other kernel of Atom can be evaluated similarly, for e.g., `./bench_reorder`. We
 To reproduce end-to-end throughput and latency evaluation, please check [e2e/README.md](./e2e/README.md).
 ## Key Results
 ### Perplexity
-We evaluate Atom's accuracy on serveral model families, including Llama, Llama-2, and OPT.
+We evaluate Atom's accuracy on serveral model families including Llama, Llama-2, and Mixtral, with data types of INT4 and FP4.
 * WikiText2, PTB and C4 datasets on Llama family:
 ![perplexity](figures/atom_ppl.png)
-* WikiText2 comparing with SmoothQuant and OmniQuant on OPT:
+* WikiText2 perplexity on Llama-2 and Mixtral:
 
-|#Bit|Method|OPT-6.7B|OPT-13B|OPT-30B|OPT-66B|
-|-|-|-|-|-|-|
-|FP16|-|10.86|10.13|9.56|9.34|
-|W4A4|SmoothQ|1.80E+04|7.40E+03|1.20E+04|2.20E+05|
-|W4A4|OmniQ|12.24|11.65|10.6|10.29|
-|W4A4|Atom|11.23|10.44|9.70|9.57|
+  <img src="figures/atom_ppl_new.png" style="width:75%;">
 
 ### End-to-end throughput and latency
 * Atom achieves up to 7.7x higher throughput with similar latency than `FP16` with a fixed GPU memory under serving scenario.
@@ -129,10 +124,14 @@ We evaluate Atom's accuracy on serveral model families, including Llama, Llama-2
 ## Reference
 If you find this project is helpful to your research, please consider to cite our paper:
 ```
-@article{zhao2023atom,
-  title={Atom: Low-bit Quantization for Efficient and Accurate LLM Serving},
-  author={Zhao, Yilong and Lin, Chien-Yu Lin and Zhu, Kan and Ye, Zihao and Chen, Lequn and Zheng, Size and Ceze, Luis and Krishnamurthy, Arvind and Chen, Tianqi and Kasikci, Baris},
-  journal={arXiv},
-  year={2023}
+@inproceedings{MLSYS2024_5edb57c0,
+ author = {Zhao, Yilong and Lin, Chien-Yu and Zhu, Kan and Ye, Zihao and Chen, Lequn and Zheng, Size and Ceze, Luis and Krishnamurthy, Arvind and Chen, Tianqi and Kasikci, Baris},
+ booktitle = {Proceedings of Machine Learning and Systems},
+ editor = {P. Gibbons and G. Pekhimenko and C. De Sa},
+ pages = {196--209},
+ title = {Atom: Low-Bit Quantization for Efficient and Accurate LLM Serving},
+ url = {https://proceedings.mlsys.org/paper_files/paper/2024/file/5edb57c05c81d04beb716ef1d542fe9e-Paper-Conference.pdf},
+ volume = {6},
+ year = {2024}
 }
 ```
