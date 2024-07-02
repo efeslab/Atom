@@ -84,9 +84,9 @@ bash scripts/run_atom_ablation.sh /Path/To/Llama/Model
 ```
 
 
-You can also customize your own quantization setup by modifying the parameters. Check [model/llama.py](./model/llama.py) to see the description of each parameter.
+You can also customize your own quantization setup by modifying the parameters. Check [model/main.py](./model/main.py) to see the description of each parameter.
 ```
-python model/llama.py /Path/To/Llama/Model wikitext2 \
+python model/main.py /Path/To/Llama/Model wikitext2 \
     --wbits 4 --abits 4 --a_sym --w_sym \
     --act_group_size 128 --weight_group_size 128 --weight_channel_group 2 \
     --reorder --act_sort_metric hessian \
